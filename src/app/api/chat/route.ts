@@ -18,13 +18,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const upstreamUrl = `${ollamaHost}/api/chat`;
   const upstreamHeaders: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
 
   try {
-    const upstream = await fetch(`${ollamaHost}/api/chat`, {
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: upstreamHeaders,
       body: JSON.stringify(body),
@@ -32,7 +33,14 @@ export async function POST(req: NextRequest) {
 
     if (!upstream.ok) {
       const text = await upstream.text();
-      return new NextResponse(text, { status: upstream.status });
+      // Try to preserve Ollama's JSON error, otherwise wrap it
+      let errorBody: object;
+      try {
+        errorBody = JSON.parse(text);
+      } catch {
+        errorBody = { error: `Ollama ${upstream.status}: ${text.slice(0, 300) || upstream.statusText}` };
+      }
+      return NextResponse.json(errorBody, { status: upstream.status });
     }
 
     return new NextResponse(upstream.body, {
