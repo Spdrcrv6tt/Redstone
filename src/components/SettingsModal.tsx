@@ -40,6 +40,15 @@ export function SettingsModal() {
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5">
+          {!local.apiKey && (
+            <div className="flex items-start gap-2.5 bg-amber-950/40 border border-amber-700/40 rounded-xl px-4 py-3">
+              <KeyRound className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300 leading-relaxed">
+                An API key is required to connect through the Cloudflare tunnel.
+                Enter it in the field below.
+              </p>
+            </div>
+          )}
           {/* Ollama Host */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">

@@ -2,7 +2,7 @@
 
 import { useAppStore } from "@/lib/store";
 import { useModels } from "@/hooks/useModels";
-import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { formatBytes } from "@/lib/utils";
 
@@ -12,7 +12,13 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ conversationId }: ModelSelectorProps) {
   const { models, loading, error, refresh } = useModels();
-  const { conversations, settings, updateSettings } = useAppStore();
+  const {
+    conversations,
+    settings,
+    updateSettings,
+    updateConversationModel,
+    setSettingsOpen,
+  } = useAppStore();
   const [open, setOpen] = useState(false);
 
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -21,13 +27,7 @@ export function ModelSelector({ conversationId }: ModelSelectorProps) {
   const handleSelect = (modelName: string) => {
     updateSettings({ defaultModel: modelName });
     if (conversationId) {
-      useAppStore.getState().conversations.find((c) => c.id === conversationId);
-      // Update the conversation model
-      useAppStore.setState((s) => ({
-        conversations: s.conversations.map((c) =>
-          c.id === conversationId ? { ...c, model: modelName } : c
-        ),
-      }));
+      updateConversationModel(conversationId, modelName);
     }
     setOpen(false);
   };
@@ -42,16 +42,35 @@ export function ModelSelector({ conversationId }: ModelSelectorProps) {
   }
 
   if (error) {
+    const isAuthError =
+      error.toLowerCase().includes("401") ||
+      error.toLowerCase().includes("403") ||
+      error.toLowerCase().includes("unauthorized");
+
     return (
-      <div className="flex items-center gap-2 text-sm text-red-400 px-3 py-2">
-        <span className="truncate">Ollama unreachable</span>
-        <button
-          onClick={refresh}
-          className="flex-shrink-0 p-1 rounded hover:bg-zinc-700 transition-colors"
-          title="Retry"
-        >
-          <RefreshCw className="w-3 h-3" />
-        </button>
+      <div className="flex items-center gap-2 text-sm px-3 py-1.5">
+        {isAuthError || !settings.apiKey ? (
+          <>
+            <KeyRound className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              Configure API key
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-red-400 truncate">Ollama unreachable</span>
+            <button
+              onClick={refresh}
+              className="flex-shrink-0 p-1 rounded hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-zinc-200"
+              title="Retry"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
+          </>
+        )}
       </div>
     );
   }
@@ -63,20 +82,24 @@ export function ModelSelector({ conversationId }: ModelSelectorProps) {
         className="flex items-center gap-1.5 text-sm font-medium text-zinc-200 px-3 py-1.5 rounded-lg hover:bg-zinc-700/60 transition-colors max-w-[220px]"
       >
         <span className="truncate">{selectedModel || "Select model"}</span>
-        <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute top-full left-0 mt-1 z-20 w-72 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl overflow-hidden">
-            <div className="p-2 text-xs font-medium text-zinc-400 uppercase tracking-wider px-3 pt-3 pb-1">
+            <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider px-3 pt-3 pb-1">
               Available Models
             </div>
             <div className="max-h-64 overflow-y-auto">
+              {models.length === 0 && (
+                <p className="text-sm text-zinc-500 px-3 py-4 text-center">
+                  No models found
+                </p>
+              )}
               {models.map((m) => (
                 <button
                   key={m.name}
@@ -86,7 +109,9 @@ export function ModelSelector({ conversationId }: ModelSelectorProps) {
                   }`}
                 >
                   <div>
-                    <div className="text-sm font-medium text-zinc-100">{m.name}</div>
+                    <div className="text-sm font-medium text-zinc-100">
+                      {m.name}
+                    </div>
                     <div className="text-xs text-zinc-500 mt-0.5">
                       {m.details?.parameter_size} · {m.details?.quantization_level}
                     </div>

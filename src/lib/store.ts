@@ -37,6 +37,7 @@ interface AppState {
   setModelsLoading: (loading: boolean) => void;
   setModelsError: (error: string | null) => void;
 
+  updateConversationModel: (conversationId: string, model: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   setSidebarOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -149,6 +150,14 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      updateConversationModel: (conversationId, model) => {
+        set((s) => ({
+          conversations: s.conversations.map((c) =>
+            c.id === conversationId ? { ...c, model } : c
+          ),
+        }));
+      },
+
       setModels: (models) => set({ models }),
       setModelsLoading: (loading) => set({ modelsLoading: loading }),
       setModelsError: (error) => set({ modelsError: error }),
@@ -166,6 +175,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "redstone-app",
+      // Prevents SSR/client hydration mismatches — rehydration is triggered
+      // manually from StoreHydrator after the first client paint.
+      skipHydration: true,
       partialize: (s) => ({
         conversations: s.conversations,
         activeConversationId: s.activeConversationId,
