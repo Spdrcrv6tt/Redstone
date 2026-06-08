@@ -3,8 +3,6 @@
 import { useRef, useCallback } from "react";
 import { useAppStore } from "@/lib/store";
 import { streamChat } from "@/lib/ollama";
-import { generateId } from "@/lib/utils";
-import type { Message } from "@/types";
 
 export function useChat(conversationId: string | null) {
   const abortRef = useRef<AbortController | null>(null);
@@ -13,7 +11,6 @@ export function useChat(conversationId: string | null) {
     settings,
     addMessage,
     updateMessage,
-    updateConversationTitle,
   } = useAppStore();
 
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -38,16 +35,14 @@ export function useChat(conversationId: string | null) {
         timestamp: Date.now(),
       });
 
-      // Prepare assistant placeholder
-      const assistantId = generateId();
-      const assistantPlaceholder: Omit<Message, "id"> = {
+      // Add assistant placeholder — capture the ID the store assigned
+      const assistantId = addMessage(conversationId, {
         role: "assistant",
         content: "",
         timestamp: Date.now(),
         model: conversation.model,
         isStreaming: true,
-      };
-      addMessage(conversationId, assistantPlaceholder);
+      });
 
       // Build messages list for the API
       const history = [
@@ -104,7 +99,7 @@ export function useChat(conversationId: string | null) {
         }
       }
     },
-    [conversationId, conversation, settings, addMessage, updateMessage, updateConversationTitle]
+    [conversationId, conversation, settings, addMessage, updateMessage]
   );
 
   return { sendMessage, stop, conversation };
