@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
 export async function POST(req: NextRequest) {
   const ollamaHost =
     req.headers.get("x-ollama-host") ||
@@ -30,8 +28,6 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: upstreamHeaders,
       body: JSON.stringify(body),
-      // @ts-expect-error - Node 18+ fetch supports duplex for streaming
-      duplex: "half",
     });
 
     if (!upstream.ok) {
@@ -39,13 +35,11 @@ export async function POST(req: NextRequest) {
       return new NextResponse(text, { status: upstream.status });
     }
 
-    // Stream the response back to the client
     return new NextResponse(upstream.body, {
       status: 200,
       headers: {
         "Content-Type": "application/x-ndjson",
-        "Transfer-Encoding": "chunked",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-transform",
         "X-Accel-Buffering": "no",
       },
     });
