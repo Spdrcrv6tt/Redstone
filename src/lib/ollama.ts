@@ -11,9 +11,15 @@ import type {
  * The Ollama host is passed via the x-ollama-host header.
  */
 
-export async function fetchModels(host: string): Promise<OllamaTagsResponse> {
+function buildHeaders(host: string, apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = { "x-ollama-host": host };
+  if (apiKey) headers["x-ollama-api-key"] = apiKey;
+  return headers;
+}
+
+export async function fetchModels(host: string, apiKey = ""): Promise<OllamaTagsResponse> {
   const res = await fetch("/api/models", {
-    headers: { "x-ollama-host": host },
+    headers: buildHeaders(host, apiKey),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -25,13 +31,14 @@ export async function fetchModels(host: string): Promise<OllamaTagsResponse> {
 export async function* streamChat(
   host: string,
   request: OllamaChatRequest,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  apiKey = ""
 ): AsyncGenerator<OllamaChatResponseChunk> {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-ollama-host": host,
+      ...buildHeaders(host, apiKey),
     },
     body: JSON.stringify({ ...request, stream: true }),
     signal,

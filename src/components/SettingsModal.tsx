@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Server, Thermometer, MessageSquare, Save } from "lucide-react";
+import { X, Server, Thermometer, MessageSquare, Save, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import type { AppSettings } from "@/types";
 
 export function SettingsModal() {
   const { settings, settingsOpen, setSettingsOpen, updateSettings } = useAppStore();
   const [local, setLocal] = useState<AppSettings>(settings);
+  const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
     if (settingsOpen) setLocal(settings);
@@ -53,6 +54,36 @@ export function SettingsModal() {
               placeholder="http://localhost:11434"
             />
             <p className="text-xs text-zinc-500 mt-1">Base URL for your Ollama instance</p>
+          </div>
+
+          {/* API Key */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
+              <KeyRound className="w-4 h-4" />
+              API Key
+            </label>
+            <div className="relative">
+              <input
+                type={showKey ? "text" : "password"}
+                value={local.apiKey}
+                onChange={(e) => setLocal((l) => ({ ...l, apiKey: e.target.value }))}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 pr-9 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors font-mono"
+                placeholder="Leave blank if not required"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                tabIndex={-1}
+              >
+                {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <p className="text-xs text-zinc-500 mt-1">
+              Sent as <span className="font-mono text-zinc-400">Authorization: Bearer &lt;key&gt;</span> — required for the Cloudflare tunnel
+            </p>
           </div>
 
           {/* Temperature */}

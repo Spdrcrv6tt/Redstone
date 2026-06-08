@@ -12,7 +12,7 @@ export function useModels() {
     setModelsLoading(true);
     setModelsError(null);
     try {
-      const data = await fetchModels(settings.ollamaHost);
+      const data = await fetchModels(settings.ollamaHost, settings.apiKey);
       setModels(data.models);
       // Auto-set default model if none selected
       if (!settings.defaultModel && data.models.length > 0) {
@@ -24,7 +24,7 @@ export function useModels() {
     } finally {
       setModelsLoading(false);
     }
-  }, [settings.ollamaHost, settings.defaultModel, setModels, setModelsLoading, setModelsError, updateSettings]);
+  }, [settings.ollamaHost, settings.apiKey, settings.defaultModel, setModels, setModelsLoading, setModelsError, updateSettings]);
 
   useEffect(() => {
     refresh();

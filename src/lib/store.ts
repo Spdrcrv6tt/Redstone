@@ -45,7 +45,8 @@ interface AppState {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  ollamaHost: "http://localhost:11434",
+  ollamaHost: "https://ollama.deoxylabs.com",
+  apiKey: "",
   defaultModel: "",
   streamResponses: true,
   systemPrompt: "",

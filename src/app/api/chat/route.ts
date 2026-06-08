@@ -8,6 +8,11 @@ export async function POST(req: NextRequest) {
     process.env.OLLAMA_HOST ||
     "http://localhost:11434";
 
+  const apiKey =
+    req.headers.get("x-ollama-api-key") ||
+    process.env.OLLAMA_API_KEY ||
+    "";
+
   let body: unknown;
   try {
     body = await req.json();
@@ -15,10 +20,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const upstreamHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+
   try {
     const upstream = await fetch(`${ollamaHost}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: upstreamHeaders,
       body: JSON.stringify(body),
       // @ts-expect-error - Node 18+ fetch supports duplex for streaming
       duplex: "half",

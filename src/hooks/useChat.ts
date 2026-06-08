@@ -72,7 +72,8 @@ export function useChat(conversationId: string | null) {
             stream: true,
             options: { temperature: settings.temperature },
           },
-          abortRef.current.signal
+          abortRef.current.signal,
+          settings.apiKey
         );
 
         for await (const chunk of generator) {

@@ -8,9 +8,19 @@ export async function GET(req: NextRequest) {
     process.env.OLLAMA_HOST ||
     "http://localhost:11434";
 
+  const apiKey =
+    req.headers.get("x-ollama-api-key") ||
+    process.env.OLLAMA_API_KEY ||
+    "";
+
+  const upstreamHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+
   try {
     const upstream = await fetch(`${ollamaHost}/api/tags`, {
-      headers: { "Content-Type": "application/json" },
+      headers: upstreamHeaders,
     });
 
     if (!upstream.ok) {

@@ -73,6 +73,7 @@ export interface OllamaChatResponseChunk {
 
 export interface AppSettings {
   ollamaHost: string;
+  apiKey: string;
   defaultModel: string;
   streamResponses: boolean;
   systemPrompt: string;
