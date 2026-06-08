@@ -5,22 +5,18 @@ import type {
 } from "@/types";
 
 /**
- * All Ollama traffic is routed through Next.js API proxy routes.
- * This avoids CORS entirely — the browser only ever talks to the same-origin
- * Next.js server, which then forwards to whatever host is configured.
- * The Ollama host is passed via the x-ollama-host header.
+ * All Ollama traffic goes through the Next.js proxy routes.
+ * For the chat route, host/key are embedded in the JSON body so the
+ * browser never needs to send custom headers — this avoids CORS
+ * preflight (OPTIONS) requests that would 405 if not handled.
+ * The models route still uses headers because it's a GET (no body).
  */
 
-function buildHeaders(host: string, apiKey: string): Record<string, string> {
+export async function fetchModels(host: string, apiKey = ""): Promise<OllamaTagsResponse> {
   const headers: Record<string, string> = { "x-ollama-host": host };
   if (apiKey) headers["x-ollama-api-key"] = apiKey;
-  return headers;
-}
 
-export async function fetchModels(host: string, apiKey = ""): Promise<OllamaTagsResponse> {
-  const res = await fetch("/api/models", {
-    headers: buildHeaders(host, apiKey),
-  });
+  const res = await fetch("/api/models", { headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Failed to fetch models: ${res.statusText}`);
@@ -36,11 +32,13 @@ export async function* streamChat(
 ): AsyncGenerator<OllamaChatResponseChunk> {
   const res = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...buildHeaders(host, apiKey),
-    },
-    body: JSON.stringify({ ...request, stream: true }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...request,
+      stream: true,
+      _host: host,
+      ...(apiKey ? { _apiKey: apiKey } : {}),
+    }),
     signal,
   });
 
