@@ -4,16 +4,21 @@ import type {
   OllamaChatResponseChunk,
 } from "@/types";
 
-export function getOllamaHost(): string {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("ollama_host") || "http://localhost:11434";
-  }
-  return process.env.OLLAMA_HOST || "http://localhost:11434";
-}
+/**
+ * All Ollama traffic is routed through Next.js API proxy routes.
+ * This avoids CORS entirely — the browser only ever talks to the same-origin
+ * Next.js server, which then forwards to whatever host is configured.
+ * The Ollama host is passed via the x-ollama-host header.
+ */
 
 export async function fetchModels(host: string): Promise<OllamaTagsResponse> {
-  const res = await fetch(`${host}/api/tags`);
-  if (!res.ok) throw new Error(`Failed to fetch models: ${res.statusText}`);
+  const res = await fetch("/api/models", {
+    headers: { "x-ollama-host": host },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Failed to fetch models: ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -22,16 +27,19 @@ export async function* streamChat(
   request: OllamaChatRequest,
   signal?: AbortSignal
 ): AsyncGenerator<OllamaChatResponseChunk> {
-  const res = await fetch(`${host}/api/chat`, {
+  const res = await fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-ollama-host": host,
+    },
     body: JSON.stringify({ ...request, stream: true }),
     signal,
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Ollama error ${res.status}: ${text}`);
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Ollama error ${res.status}: ${res.statusText}`);
   }
 
   if (!res.body) throw new Error("No response body");
