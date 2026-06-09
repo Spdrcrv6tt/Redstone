@@ -1,4 +1,44 @@
 export type Role = "user" | "assistant" | "system";
+export type Theme = "light" | "dark";
+
+export interface MessageAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  /** Blob URL for image previews in the UI */
+  previewUrl?: string;
+  /** Raw base64 (no data-URL prefix) for Ollama vision models */
+  base64?: string;
+  /** Extracted text for plain-text files */
+  textContent?: string;
+}
+
+export interface SearchSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export interface SearchImage {
+  title: string;
+  imageUrl: string;
+  thumbnailUrl: string;
+  sourceUrl: string;
+  width?: number;
+  height?: number;
+}
+
+export interface MessageSearchMeta {
+  query: string;
+  sources: SearchSource[];
+  images: SearchImage[];
+  searchError?: string;
+  imageError?: string;
+}
+
+/** Server stream metadata (same shape as MessageSearchMeta). */
+export type AgentStreamMeta = MessageSearchMeta;
 
 export interface Message {
   id: string;
@@ -8,6 +48,9 @@ export interface Message {
   model?: string;
   isStreaming?: boolean;
   error?: string;
+  attachments?: MessageAttachment[];
+  /** Web search data for this assistant turn (not shown as a tool call) */
+  search?: MessageSearchMeta;
 }
 
 export interface Conversation {
@@ -42,6 +85,7 @@ export interface OllamaTagsResponse {
 export interface OllamaChatMessage {
   role: Role;
   content: string;
+  images?: string[];
 }
 
 export interface OllamaChatRequest {
@@ -53,6 +97,7 @@ export interface OllamaChatRequest {
     top_p?: number;
     top_k?: number;
     num_ctx?: number;
+    num_predict?: number;
   };
 }
 
@@ -74,8 +119,10 @@ export interface OllamaChatResponseChunk {
 export interface AppSettings {
   ollamaHost: string;
   apiKey: string;
+  braveApiKey: string;
   defaultModel: string;
   streamResponses: boolean;
   systemPrompt: string;
   temperature: number;
+  displayName: string;
 }

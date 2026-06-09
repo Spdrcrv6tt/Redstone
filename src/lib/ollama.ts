@@ -2,49 +2,92 @@ import type {
   OllamaTagsResponse,
   OllamaChatRequest,
   OllamaChatResponseChunk,
+  MessageSearchMeta,
 } from "@/types";
 
 /**
- * All Ollama traffic goes through the Next.js proxy routes.
- * For the chat route, host/key are embedded in the JSON body so the
- * browser never needs to send custom headers — this avoids CORS
- * preflight (OPTIONS) requests that would 405 if not handled.
- * The models route still uses headers because it's a GET (no body).
+ * All Ollama traffic goes through Next.js proxy routes.
+ * Host and API key travel in the JSON body — never as custom headers —
+ * so browsers never trigger CORS preflight that can 405.
  */
 
-export async function fetchModels(host: string, apiKey = ""): Promise<OllamaTagsResponse> {
-  const headers: Record<string, string> = { "x-ollama-host": host };
-  if (apiKey) headers["x-ollama-api-key"] = apiKey;
+function proxyBody(
+  host: string,
+  apiKey: string,
+  extras?: {
+    braveApiKey?: string;
+    systemPrompt?: string;
+    priorImageUrls?: string[];
+  }
+) {
+  return {
+    _host: host,
+    ...(apiKey ? { _apiKey: apiKey } : {}),
+    ...(extras?.braveApiKey ? { _braveApiKey: extras.braveApiKey } : {}),
+    ...(extras?.systemPrompt !== undefined
+      ? { _systemPrompt: extras.systemPrompt }
+      : {}),
+    ...(extras?.priorImageUrls?.length
+      ? { _priorImageUrls: extras.priorImageUrls }
+      : {}),
+  };
+}
 
-  const res = await fetch("/api/models", { headers });
+export type AgentStreamEvent =
+  | { type: "meta"; meta: MessageSearchMeta }
+  | { type: "chunk"; chunk: OllamaChatResponseChunk };
+
+export async function fetchModels(
+  host: string,
+  apiKey = ""
+): Promise<OllamaTagsResponse> {
+  const res = await fetch("/api/models", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(proxyBody(host, apiKey)),
+  });
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Failed to fetch models: ${res.statusText}`);
+    throw new Error(
+      (body as { error?: string }).error ||
+        `Failed to fetch models: ${res.status} ${res.statusText}`
+    );
   }
   return res.json();
 }
 
-export async function* streamChat(
+/** Chat with automatic Brave web search (server-side, not tool-calling). */
+export async function* streamAgent(
   host: string,
   request: OllamaChatRequest,
   signal?: AbortSignal,
-  apiKey = ""
-): AsyncGenerator<OllamaChatResponseChunk> {
-  const res = await fetch("/api/chat", {
+  apiKey = "",
+  braveApiKey = "",
+  systemPrompt = "",
+  priorImageUrls: string[] = []
+): AsyncGenerator<AgentStreamEvent> {
+  const res = await fetch("/api/agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...request,
       stream: true,
-      _host: host,
-      ...(apiKey ? { _apiKey: apiKey } : {}),
+      ...proxyBody(host, apiKey, {
+        braveApiKey,
+        systemPrompt,
+        priorImageUrls,
+      }),
     }),
     signal,
   });
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Ollama error ${res.status}: ${res.statusText}`);
+    throw new Error(
+      (body as { error?: string }).error ||
+        `Agent error ${res.status}: ${res.statusText}`
+    );
   }
 
   if (!res.body) throw new Error("No response body");
@@ -52,6 +95,7 @@ export async function* streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let metaParsed = false;
 
   try {
     while (true) {
@@ -65,9 +109,26 @@ export async function* streamChat(
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
+
+        if (!metaParsed) {
+          try {
+            const parsed = JSON.parse(trimmed) as {
+              redstone_meta?: MessageSearchMeta;
+            };
+            if (parsed.redstone_meta) {
+              yield { type: "meta", meta: parsed.redstone_meta };
+              metaParsed = true;
+              continue;
+            }
+          } catch {
+            // not meta line — fall through
+          }
+          metaParsed = true;
+        }
+
         try {
           const chunk: OllamaChatResponseChunk = JSON.parse(trimmed);
-          yield chunk;
+          yield { type: "chunk", chunk };
           if (chunk.done) return;
         } catch {
           // skip malformed lines

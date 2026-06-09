@@ -1,155 +1,353 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Server, Thermometer, MessageSquare, Save, KeyRound, Eye, EyeOff } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  Server,
+  Thermometer,
+  MessageSquare,
+  KeyRound,
+  Eye,
+  EyeOff,
+  User,
+  Sun,
+  Moon,
+  Cpu,
+  Globe,
+} from "lucide-react";
+import { ModelPicker } from "@/components/ModelPicker";
+import type { Theme } from "@/types";
 import { useAppStore } from "@/lib/store";
 import type { AppSettings } from "@/types";
 
 export function SettingsModal() {
-  const { settings, settingsOpen, setSettingsOpen, updateSettings } = useAppStore();
+  const { settings, settingsOpen, theme, setSettingsOpen, updateSettings, setTheme } =
+    useAppStore();
   const [local, setLocal] = useState<AppSettings>(settings);
   const [showKey, setShowKey] = useState(false);
+  const [showBraveKey, setShowBraveKey] = useState(false);
 
   useEffect(() => {
-    if (settingsOpen) setLocal(settings);
+    if (settingsOpen) {
+      setLocal({
+        ...settings,
+        displayName: settings.displayName ?? "",
+        braveApiKey: settings.braveApiKey ?? "",
+      });
+    }
   }, [settingsOpen, settings]);
 
-  if (!settingsOpen) return null;
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSettingsOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [settingsOpen, setSettingsOpen]);
 
   const save = () => {
     updateSettings(local);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("ollama_host", local.ollamaHost);
-    }
     setSettingsOpen(false);
   };
 
+  const tempLabel =
+    local.temperature <= 0.4
+      ? "Precise"
+      : local.temperature <= 1.0
+        ? "Balanced"
+        : "Creative";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <h2 className="text-base font-semibold text-zinc-100">Settings</h2>
-          <button
-            onClick={() => setSettingsOpen(false)}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+    <AnimatePresence>
+      {settingsOpen && (
+        <motion.div
+          className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-[6px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setSettingsOpen(false)}
+        >
+          <motion.div
+            className="modal-panel rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[min(88vh,720px)]"
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 480, damping: 34 }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5">
-          {!local.apiKey && (
-            <div className="flex items-start gap-2.5 bg-amber-950/40 border border-amber-700/40 rounded-xl px-4 py-3">
-              <KeyRound className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-300 leading-relaxed">
-                An API key is required to connect through the Cloudflare tunnel.
-                Enter it in the field below.
-              </p>
-            </div>
-          )}
-          {/* Ollama Host */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
-              <Server className="w-4 h-4" />
-              Ollama Host
-            </label>
-            <input
-              type="text"
-              value={local.ollamaHost}
-              onChange={(e) => setLocal((l) => ({ ...l, ollamaHost: e.target.value }))}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors"
-              placeholder="http://localhost:11434"
-            />
-            <p className="text-xs text-zinc-500 mt-1">Base URL for your Ollama instance</p>
-          </div>
-
-          {/* API Key */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
-              <KeyRound className="w-4 h-4" />
-              API Key
-            </label>
-            <div className="relative">
-              <input
-                type={showKey ? "text" : "password"}
-                value={local.apiKey}
-                onChange={(e) => setLocal((l) => ({ ...l, apiKey: e.target.value }))}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 pr-9 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors font-mono"
-                placeholder="Leave blank if not required"
-                autoComplete="off"
-                spellCheck={false}
-              />
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 py-5 border-b border-theme flex-shrink-0">
+              <div>
+                <h2 id="settings-title" className="text-[15px] font-semibold text-primary tracking-tight">
+                  Settings
+                </h2>
+                <p className="text-xs text-muted mt-0.5">
+                  Appearance, models, and connection
+                </p>
+              </div>
               <button
-                type="button"
-                onClick={() => setShowKey((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                tabIndex={-1}
+                onClick={() => setSettingsOpen(false)}
+                className="p-2 -mr-1 -mt-0.5 rounded-xl btn-ghost text-muted"
+                aria-label="Close settings"
               >
-                {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
-              Sent as <span className="font-mono text-zinc-400">Authorization: Bearer &lt;key&gt;</span> — required for the Cloudflare tunnel
-            </p>
-          </div>
 
-          {/* Temperature */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
-              <Thermometer className="w-4 h-4" />
-              Temperature
-              <span className="ml-auto text-zinc-400 font-mono text-xs">{local.temperature.toFixed(1)}</span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.1}
-              value={local.temperature}
-              onChange={(e) => setLocal((l) => ({ ...l, temperature: parseFloat(e.target.value) }))}
-              className="w-full accent-orange-500"
-            />
-            <div className="flex justify-between text-xs text-zinc-600 mt-1">
-              <span>Precise</span>
-              <span>Creative</span>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 min-h-0">
+              {!local.apiKey && (
+                <div className="alert-banner flex items-start gap-3 rounded-xl px-4 py-3">
+                  <KeyRound className="w-4 h-4 flex-shrink-0 mt-0.5 opacity-80" />
+                  <p className="text-xs leading-relaxed">
+                    An API key is required to connect through the Cloudflare tunnel.
+                  </p>
+                </div>
+              )}
+
+              <section>
+                <p className="settings-section-title">Appearance</p>
+                <div className="segmented-control">
+                  {(["light", "dark"] as Theme[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTheme(t)}
+                      className={[
+                        "segmented-option",
+                        theme === t ? "segmented-option-active" : "",
+                      ].join(" ")}
+                    >
+                      {t === "light" ? (
+                        <Sun className="w-3.5 h-3.5" />
+                      ) : (
+                        <Moon className="w-3.5 h-3.5" />
+                      )}
+                      {t === "light" ? "Light" : "Dark"}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <div className="settings-divider" />
+
+              <section>
+                <p className="settings-section-title">Personalization</p>
+                <Field label="Display name" icon={User}>
+                  <input
+                    type="text"
+                    value={local.displayName}
+                    onChange={(e) =>
+                      setLocal((l) => ({ ...l, displayName: e.target.value }))
+                    }
+                    className="field-input"
+                    placeholder="Your name (optional)"
+                  />
+                  <Hint>Shown in the greeting on the home screen</Hint>
+                </Field>
+              </section>
+
+              <div className="settings-divider" />
+
+              <section>
+                <p className="settings-section-title">Model</p>
+                <Field label="Default model" icon={Cpu}>
+                  <ModelPicker
+                    variant="panel"
+                    value={local.defaultModel}
+                    onChange={(name) =>
+                      setLocal((l) => ({ ...l, defaultModel: name }))
+                    }
+                  />
+                  <Hint>Used for new chats. Override per conversation in the composer.</Hint>
+                </Field>
+              </section>
+
+              <div className="settings-divider" />
+
+              <section>
+                <p className="settings-section-title">Connection</p>
+                <div className="space-y-4">
+                  <Field label="Ollama host" icon={Server}>
+                    <input
+                      type="text"
+                      value={local.ollamaHost}
+                      onChange={(e) =>
+                        setLocal((l) => ({ ...l, ollamaHost: e.target.value }))
+                      }
+                      className="field-input font-mono text-[13px]"
+                      placeholder="http://localhost:11434"
+                      spellCheck={false}
+                    />
+                  </Field>
+
+                  <Field label="Ollama API key" icon={KeyRound}>
+                    <div className="relative">
+                      <input
+                        type={showKey ? "text" : "password"}
+                        value={local.apiKey}
+                        onChange={(e) =>
+                          setLocal((l) => ({ ...l, apiKey: e.target.value }))
+                        }
+                        className="field-input pr-10 font-mono text-[13px]"
+                        placeholder="Leave blank if not required"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-muted hover:text-secondary btn-ghost"
+                        tabIndex={-1}
+                        aria-label={showKey ? "Hide API key" : "Show API key"}
+                      >
+                        {showKey ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </Field>
+
+                  <Field label="Brave Search API key" icon={Globe}>
+                    <div className="relative">
+                      <input
+                        type={showBraveKey ? "text" : "password"}
+                        value={local.braveApiKey}
+                        onChange={(e) =>
+                          setLocal((l) => ({ ...l, braveApiKey: e.target.value }))
+                        }
+                        className="field-input pr-10 font-mono text-[13px]"
+                        placeholder="For automatic web search on every message"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowBraveKey((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-muted hover:text-secondary btn-ghost"
+                        tabIndex={-1}
+                        aria-label={
+                          showBraveKey ? "Hide Brave API key" : "Show Brave API key"
+                        }
+                      >
+                        {showBraveKey ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                    <Hint>
+                      Web search runs automatically before every response. Can also
+                      be set via BRAVE_SEARCH_API_KEY on the server.
+                    </Hint>
+                  </Field>
+                </div>
+              </section>
+
+              <div className="settings-divider" />
+
+              <section>
+                <p className="settings-section-title">Generation</p>
+                <div className="space-y-4">
+                  <Field label="Temperature" icon={Thermometer}>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.1}
+                        value={local.temperature}
+                        onChange={(e) =>
+                          setLocal((l) => ({
+                            ...l,
+                            temperature: parseFloat(e.target.value),
+                          }))
+                        }
+                        className="range-track flex-1"
+                      />
+                      <div className="text-right flex-shrink-0 w-16">
+                        <p className="text-xs font-medium text-primary">
+                          {local.temperature.toFixed(1)}
+                        </p>
+                        <p className="text-[10px] text-muted">{tempLabel}</p>
+                      </div>
+                    </div>
+                  </Field>
+
+                  <Field label="System prompt" icon={MessageSquare}>
+                    <textarea
+                      value={local.systemPrompt}
+                      onChange={(e) =>
+                        setLocal((l) => ({ ...l, systemPrompt: e.target.value }))
+                      }
+                      rows={4}
+                      className="field-input resize-none leading-relaxed"
+                      placeholder="You are a helpful assistant…"
+                    />
+                    <Hint>
+                      Optional extra instructions. Web search context is added
+                      automatically — you don&apos;t need to ask the model to search.
+                    </Hint>
+                  </Field>
+                </div>
+              </section>
             </div>
-          </div>
 
-          {/* System Prompt */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
-              <MessageSquare className="w-4 h-4" />
-              System Prompt
-            </label>
-            <textarea
-              value={local.systemPrompt}
-              onChange={(e) => setLocal((l) => ({ ...l, systemPrompt: e.target.value }))}
-              rows={3}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition-colors resize-none"
-              placeholder="You are a helpful assistant…"
-            />
-          </div>
-        </div>
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-theme flex-shrink-0 bg-surface-muted/40">
+              <p className="text-[11px] text-muted hidden sm:block">
+                Changes apply after saving
+              </p>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => setSettingsOpen(false)}
+                  className="px-4 py-2 text-sm btn-ghost rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={save}
+                  className="px-5 py-2 text-sm font-medium btn-send rounded-xl"
+                >
+                  Save changes
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
-        {/* Footer */}
-        <div className="px-6 pb-5 flex justify-end gap-2">
-          <button
-            onClick={() => setSettingsOpen(false)}
-            className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 rounded-xl hover:bg-zinc-800 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-orange-500 hover:bg-orange-400 text-white rounded-xl transition-colors"
-          >
-            <Save className="w-3.5 h-3.5" />
-            Save
-          </button>
-        </div>
-      </div>
+function Field({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="flex items-center gap-2 text-sm font-medium text-primary mb-2">
+        <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.75} />
+        {label}
+      </label>
+      {children}
     </div>
   );
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] text-muted mt-1.5 leading-relaxed">{children}</p>;
 }

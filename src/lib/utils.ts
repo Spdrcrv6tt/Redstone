@@ -19,3 +19,9 @@ export function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
+
+/** Short label for the composer pill — "llama3.2:latest" → "llama3.2" */
+export function formatModelLabel(name: string): string {
+  const base = name.split(":")[0];
+  return base.length > 18 ? `${base.slice(0, 16)}…` : base;
+}

@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Conversation, Message, AppSettings, OllamaModel } from "@/types";
+import type { Theme } from "@/types";
 import { generateId } from "@/lib/utils";
 import { generateTitle } from "@/lib/ollama";
 
@@ -20,7 +21,8 @@ interface AppState {
   settings: AppSettings;
 
   // ui
-  sidebarOpen: boolean;
+  theme: Theme;
+  sidebarExpanded: boolean;
   settingsOpen: boolean;
 
   // actions
@@ -39,19 +41,25 @@ interface AppState {
 
   updateConversationModel: (conversationId: string, model: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
-  setSidebarOpen: (open: boolean) => void;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+  toggleSidebar: () => void;
+  setSidebarExpanded: (expanded: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
 
-  getActiveConversation: () => Conversation | null;
 }
+
+export const PREFERRED_DEFAULT_MODEL = "gemma4:12b";
 
 const DEFAULT_SETTINGS: AppSettings = {
   ollamaHost: "https://ollama.deoxylabs.com",
   apiKey: "",
-  defaultModel: "",
+  braveApiKey: "",
+  defaultModel: PREFERRED_DEFAULT_MODEL,
   streamResponses: true,
   systemPrompt: "",
   temperature: 0.7,
+  displayName: "",
 };
 
 export const useAppStore = create<AppState>()(
@@ -63,7 +71,8 @@ export const useAppStore = create<AppState>()(
       modelsLoading: false,
       modelsError: null,
       settings: DEFAULT_SETTINGS,
-      sidebarOpen: true,
+      theme: "light",
+      sidebarExpanded: false,
       settingsOpen: false,
 
       createConversation: (model) => {
@@ -165,25 +174,41 @@ export const useAppStore = create<AppState>()(
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),
 
-      setSidebarOpen: (open) => set({ sidebarOpen: open }),
-      setSettingsOpen: (open) => set({ settingsOpen: open }),
+      setTheme: (theme) => set({ theme }),
+      toggleTheme: () =>
+        set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
 
-      getActiveConversation: () => {
-        const { conversations, activeConversationId } = get();
-        return conversations.find((c) => c.id === activeConversationId) ?? null;
-      },
+      toggleSidebar: () =>
+        set((s) => ({ sidebarExpanded: !s.sidebarExpanded })),
+      setSidebarExpanded: (expanded) => set({ sidebarExpanded: expanded }),
+      setSettingsOpen: (open) => set({ settingsOpen: open }),
     }),
     {
       name: "redstone-app",
       // Prevents SSR/client hydration mismatches — rehydration is triggered
-      // manually from StoreHydrator after the first client paint.
+      // manually from AppBootstrap after the first client paint.
       skipHydration: true,
       partialize: (s) => ({
         conversations: s.conversations,
         activeConversationId: s.activeConversationId,
         settings: s.settings,
-        sidebarOpen: s.sidebarOpen,
+        theme: s.theme,
       }),
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<AppState> | undefined;
+        if (!saved) return current;
+        return {
+          ...current,
+          ...saved,
+          theme: saved.theme ?? current.theme,
+          settings: {
+            ...DEFAULT_SETTINGS,
+            ...saved.settings,
+            defaultModel:
+              saved.settings?.defaultModel || DEFAULT_SETTINGS.defaultModel,
+          },
+        };
+      },
     }
   )
 );

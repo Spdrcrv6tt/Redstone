@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  configFromBody,
+  upstreamHeaders,
+  CORS_HEADERS,
+} from "@/lib/proxy";
 
-// Handle CORS preflight — browsers send OPTIONS before POST when
-// non-standard headers are present.
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  });
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export async function POST(req: NextRequest) {
@@ -21,32 +20,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  // Pull proxy config out of the body; the rest is forwarded to Ollama.
-  const { _host, _apiKey, ...ollamaBody } = body as {
+  const { host, apiKey } = configFromBody(body);
+  const { _host: _, _apiKey: __, ...ollamaBody } = body as {
     _host?: string;
     _apiKey?: string;
     [key: string]: unknown;
   };
 
-  const ollamaHost =
-    _host ||
-    process.env.OLLAMA_HOST ||
-    "http://localhost:11434";
-
-  const apiKey =
-    _apiKey ||
-    process.env.OLLAMA_API_KEY ||
-    "";
-
-  const upstreamHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+  if (!ollamaBody.model) {
+    return NextResponse.json({ error: "model is required" }, { status: 400 });
+  }
 
   try {
-    const upstream = await fetch(`${ollamaHost}/api/chat`, {
+    const upstream = await fetch(`${host}/api/chat`, {
       method: "POST",
-      headers: upstreamHeaders,
+      headers: upstreamHeaders(apiKey),
       body: JSON.stringify(ollamaBody),
     });
 
@@ -56,7 +44,9 @@ export async function POST(req: NextRequest) {
       try {
         errorBody = JSON.parse(text);
       } catch {
-        errorBody = { error: `Ollama ${upstream.status}: ${text.slice(0, 300) || upstream.statusText}` };
+        errorBody = {
+          error: `Ollama ${upstream.status}: ${text.slice(0, 300) || upstream.statusText}`,
+        };
       }
       return NextResponse.json(errorBody, { status: upstream.status });
     }
@@ -76,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: isConnRefused
-          ? `Cannot reach Ollama at ${ollamaHost}. Is it running?`
+          ? `Cannot reach Ollama at ${host}. Is it running?`
           : message,
       },
       { status: 502 }

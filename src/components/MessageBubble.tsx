@@ -1,148 +1,274 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Copy, Check, AlertCircle, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Copy, Check, FileText, RotateCcw, Globe } from "lucide-react";
+import { LivePreview } from "@/components/LivePreview";
+import { AssistantArticle } from "@/components/AssistantArticle";
+import { SearchImagePreloader } from "@/components/SearchImages";
+import { cleanSearchResponse, plainSearchResponse } from "@/lib/search/citations";
+import { formatFileSize } from "@/lib/files";
+import { hasWebPreview } from "@/lib/markdown-code";
 import type { Message } from "@/types";
 
 interface MessageBubbleProps {
   message: Message;
-  index: number;
+  onRegenerate?: () => void;
+  showRegenerate?: boolean;
 }
 
-export function MessageBubble({ message, index }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  onRegenerate,
+  showRegenerate,
+}: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
+  const previewId = `live-preview-${message.id}`;
+  const showLivePreview =
+    !isUser && !!message.content && hasWebPreview(message.content);
+  const searchSources = message.search?.sources ?? [];
+  const searchImages = message.search?.images ?? [];
+  const hasSearchImages = searchImages.length > 0;
+  const assistantContent =
+    !isUser && message.content ? cleanSearchResponse(message.content) : "";
+
+  const [imageReady, setImageReady] = useState(!hasSearchImages);
+
+  useEffect(() => {
+    if (!hasSearchImages) {
+      setImageReady(true);
+      return;
+    }
+    setImageReady(false);
+  }, [message.id, hasSearchImages]);
+
+  const isPending =
+    message.isStreaming || (hasSearchImages && !imageReady);
+  const canRevealBody = !!assistantContent && !isPending;
 
   const copy = async () => {
-    await navigator.clipboard.writeText(message.content);
+    const text = !isUser && message.content
+      ? plainSearchResponse(message.content)
+      : message.content;
+    await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (message.error) {
+    return (
+      <motion.div
+        className="px-4 sm:px-0 py-2"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <p className="text-sm text-red-500 bg-red-500/10 rounded-2xl px-4 py-3 border border-red-500/20">
+          {message.error}
+        </p>
+        {showRegenerate && onRegenerate && (
+          <ActionBar
+            onCopy={copy}
+            copied={copied}
+            onRegenerate={onRegenerate}
+            showRegenerate
+          />
+        )}
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
-      className={`flex gap-3 px-5 py-2 group ${isUser ? "flex-row-reverse" : "flex-row"}`}
-      initial={{ opacity: 0, y: 12 }}
+      className={`group py-3 ${isUser ? "flex justify-end" : ""} ${message.isStreaming ? "message-streaming" : ""}`}
+      initial={isUser ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1], delay: index === 0 ? 0 : 0 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* Avatar */}
-      {!isUser && (
-        <div
-          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center mt-0.5"
-          style={{
-            background: "rgba(249,115,22,0.12)",
-            border: "1px solid rgba(249,115,22,0.18)",
-          }}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-        </div>
-      )}
-
-      {/* Content */}
-      <div className={`flex flex-col max-w-[78%] gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
-        {/* Error banner */}
-        {message.error && (
+      <div
+        className={
+          isUser
+            ? "max-w-[min(85%,520px)]"
+            : "w-full"
+        }
+      >
+        {message.attachments && message.attachments.length > 0 && (
           <div
-            className="flex items-center gap-2 text-sm text-red-400 px-4 py-2.5 rounded-xl"
-            style={{
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.18)",
-            }}
+            className={`flex flex-wrap gap-2 mb-2 ${isUser ? "justify-end" : ""}`}
           >
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="text-xs">{message.error}</span>
+            {message.attachments.map((att) =>
+              att.previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={att.id}
+                  src={att.previewUrl}
+                  alt={att.name}
+                  className="max-w-[200px] max-h-[160px] rounded-2xl object-cover border border-theme"
+                />
+              ) : (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-muted border border-theme text-left"
+                >
+                  <FileText className="w-4 h-4 text-secondary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-primary">{att.name}</p>
+                    <p className="text-[10px] text-muted">
+                      {formatFileSize(att.size)}
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
 
-        {/* Bubble */}
-        {message.content && (
-          <div
-            className="rounded-2xl px-4 py-3 text-sm leading-relaxed relative overflow-hidden"
-            style={
-              isUser
-                ? {
-                    background: "rgba(249,115,22,0.1)",
-                    border: "1px solid rgba(249,115,22,0.16)",
-                    borderBottomRightRadius: "6px",
-                    boxShadow: "inset 0 1px 0 rgba(249,115,22,0.08)",
-                  }
-                : {
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.07)",
-                    borderTopLeftRadius: "6px",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
-                    backdropFilter: "blur(12px)",
-                  }
-            }
-          >
-            {/* Top-edge shine for AI bubble */}
-            {!isUser && (
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            )}
+        {isUser && message.content && (
+          <div className="inline-block text-left px-5 py-3 rounded-[22px] rounded-br-[6px] user-bubble leading-relaxed whitespace-pre-wrap shadow-sm">
+            {message.content}
+          </div>
+        )}
 
-            {isUser ? (
-              <p className="text-zinc-100 whitespace-pre-wrap">{message.content}</p>
-            ) : (
-              <div className="prose prose-sm prose-invert max-w-none text-zinc-200">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content}
-                </ReactMarkdown>
-              </div>
-            )}
-
-            {/* Streaming cursor */}
-            {message.isStreaming && (
-              <span
-                className="inline-block w-[3px] h-[1.1em] rounded-full ml-0.5 align-text-bottom"
-                style={{
-                  background: "rgba(249,115,22,0.9)",
-                  animation: "pulse-glow 0.8s ease-in-out infinite",
-                }}
+        {!isUser && (
+          <div className="leading-[1.75] text-primary">
+            {hasSearchImages && !imageReady && (
+              <SearchImagePreloader
+                images={searchImages}
+                onReady={() => setImageReady(true)}
               />
             )}
+
+            <AnimatePresence initial={false}>
+              {canRevealBody ? (
+                <motion.div
+                  key={`reveal-${message.id}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 1.6,
+                    ease: [0.4, 0, 0.2, 1],
+                    opacity: { duration: 1.6, ease: "linear" },
+                    y: { duration: 1.6, ease: [0.4, 0, 0.2, 1] },
+                  }}
+                >
+                  <AssistantArticle
+                    content={assistantContent}
+                    images={searchImages}
+                    searchSources={searchSources}
+                    previewTargetId={
+                      showLivePreview ? previewId : undefined
+                    }
+                  />
+                  {showLivePreview && (
+                    <LivePreview
+                      id={previewId}
+                      markdown={assistantContent}
+                      defaultOpen
+                    />
+                  )}
+                </motion.div>
+              ) : isPending ? (
+                <motion.div
+                  key="loading"
+                  className="py-2 space-y-2"
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                >
+                  <p className="text-[11px] text-muted flex items-center gap-1.5">
+                    <Globe className="w-3 h-3 text-indigo-500 animate-pulse" />
+                    Searching the web…
+                  </p>
+                  <div className="flex gap-1.5">
+                    {[0, 160, 320].map((delay) => (
+                      <span
+                        key={delay}
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: "var(--text-muted)",
+                          animation: `dot-pulse 1.4s ease-in-out ${delay}ms infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+
           </div>
         )}
 
-        {/* Empty streaming state */}
-        {!message.content && message.isStreaming && (
-          <div
-            className="px-4 py-3 rounded-2xl"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderTopLeftRadius: "6px",
-            }}
-          >
-            <div className="flex gap-1.5 items-center">
-              {[0, 150, 300].map((delay) => (
-                <span
-                  key={delay}
-                  className="w-1.5 h-1.5 rounded-full bg-zinc-500"
-                  style={{ animation: `pulse-glow 1.2s ease-in-out ${delay}ms infinite` }}
-                />
-              ))}
-            </div>
+        {/* User copy on hover */}
+        {isUser && message.content && (
+          <div className="flex justify-end mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ActionButton onClick={copy} title="Copy">
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-green-500" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </ActionButton>
           </div>
         )}
 
-        {/* Copy button — AI only */}
-        {!isUser && !message.isStreaming && message.content && (
-          <button
-            onClick={copy}
-            className="flex items-center gap-1.5 text-xs text-zinc-700 hover:text-zinc-400 px-2 py-1 rounded-lg transition-all duration-150 opacity-0 group-hover:opacity-100"
-            style={{ background: "transparent" }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-          >
-            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-            {copied ? "Copied" : "Copy"}
-          </button>
+        {!isUser && !message.isStreaming && assistantContent && (
+          <ActionBar
+            onCopy={copy}
+            copied={copied}
+            onRegenerate={onRegenerate}
+            showRegenerate={showRegenerate}
+          />
         )}
       </div>
     </motion.div>
+  );
+}
+
+function ActionBar({
+  onCopy,
+  copied,
+  onRegenerate,
+  showRegenerate,
+}: {
+  onCopy: () => void;
+  copied: boolean;
+  onRegenerate?: () => void;
+  showRegenerate?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+      {showRegenerate && onRegenerate && (
+        <ActionButton onClick={onRegenerate} title="Regenerate">
+          <RotateCcw className="w-3.5 h-3.5" />
+        </ActionButton>
+      )}
+      <ActionButton onClick={onCopy} title="Copy">
+        {copied ? (
+          <Check className="w-3.5 h-3.5 text-green-500" />
+        ) : (
+          <Copy className="w-3.5 h-3.5" />
+        )}
+      </ActionButton>
+    </div>
+  );
+}
+
+function ActionButton({
+  onClick,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="p-2 rounded-lg text-muted hover:text-primary hover:bg-surface-hover transition-colors"
+    >
+      {children}
+    </button>
   );
 }

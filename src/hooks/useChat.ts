@@ -2,7 +2,109 @@
 
 import { useRef, useCallback } from "react";
 import { useAppStore } from "@/lib/store";
-import { streamChat } from "@/lib/ollama";
+import { streamAgent } from "@/lib/ollama";
+import { buildMessageContent, extractImages } from "@/lib/files";
+import type {
+  Message,
+  MessageAttachment,
+  MessageSearchMeta,
+  OllamaChatMessage,
+  AppSettings,
+} from "@/types";
+
+function collectPriorImageUrls(messages: Message[]): string[] {
+  const urls = new Set<string>();
+  for (const m of messages) {
+    for (const img of m.search?.images ?? []) {
+      urls.add(img.imageUrl);
+      if (img.sourceUrl) urls.add(img.sourceUrl);
+      if (img.thumbnailUrl) urls.add(img.thumbnailUrl);
+    }
+  }
+  return [...urls];
+}
+
+function toApiMessage(m: Message): OllamaChatMessage {
+  const content = buildMessageContent(m.content, m.attachments ?? []);
+  const images = extractImages(m.attachments ?? []);
+  return {
+    role: m.role,
+    content,
+    ...(images.length ? { images } : {}),
+  };
+}
+
+async function streamResponse(
+  conversationId: string,
+  assistantId: string,
+  history: OllamaChatMessage[],
+  model: string,
+  settings: AppSettings,
+  priorImageUrls: string[],
+  signal: AbortSignal,
+  updateMessage: (
+    conversationId: string,
+    messageId: string,
+    patch: Partial<Message>
+  ) => void
+) {
+  let accumulated = "";
+  let searchMeta: MessageSearchMeta | undefined = {
+    query: "",
+    sources: [],
+    images: [],
+    searchError: undefined,
+  };
+
+  updateMessage(conversationId, assistantId, {
+    search: { query: "", sources: [], images: [] },
+  });
+
+  const generator = streamAgent(
+    settings.ollamaHost,
+    {
+      model,
+      messages: history,
+      stream: true,
+      options: {
+        temperature: settings.temperature,
+        num_ctx: 16384,
+        num_predict: 4096,
+      },
+    },
+    signal,
+    settings.apiKey,
+    settings.braveApiKey,
+    settings.systemPrompt,
+    priorImageUrls
+  );
+
+  for await (const event of generator) {
+    if (event.type === "meta") {
+      searchMeta = event.meta;
+      updateMessage(conversationId, assistantId, { search: event.meta });
+      continue;
+    }
+
+    const chunk = event.chunk;
+    if (chunk.message?.content) {
+      accumulated += chunk.message.content;
+      updateMessage(conversationId, assistantId, {
+        content: accumulated,
+        isStreaming: !chunk.done,
+        search: searchMeta,
+      });
+    }
+    if (chunk.done) {
+      updateMessage(conversationId, assistantId, {
+        content: accumulated,
+        isStreaming: false,
+        search: searchMeta,
+      });
+      break;
+    }
+  }
+}
 
 export function useChat(conversationId: string | null) {
   const abortRef = useRef<AbortController | null>(null);
@@ -11,6 +113,7 @@ export function useChat(conversationId: string | null) {
     settings,
     addMessage,
     updateMessage,
+    deleteMessage,
   } = useAppStore();
 
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -19,74 +122,36 @@ export function useChat(conversationId: string | null) {
     abortRef.current?.abort();
   }, []);
 
-  const sendMessage = useCallback(
-    async (content: string) => {
-      if (!conversationId || !conversation) return;
-      if (!conversation.model) return;
+  const runStream = useCallback(
+    async (
+      history: OllamaChatMessage[],
+      model: string,
+      priorImageUrls: string[] = []
+    ) => {
+      if (!conversationId) return;
 
-      // Cancel any in-flight request
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-
-      // Add user message
-      addMessage(conversationId, {
-        role: "user",
-        content,
-        timestamp: Date.now(),
-      });
-
-      // Add assistant placeholder — capture the ID the store assigned
       const assistantId = addMessage(conversationId, {
         role: "assistant",
         content: "",
         timestamp: Date.now(),
-        model: conversation.model,
+        model,
         isStreaming: true,
       });
 
-      // Build messages list for the API
-      const history = [
-        ...(settings.systemPrompt
-          ? [{ role: "system" as const, content: settings.systemPrompt }]
-          : []),
-        ...conversation.messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        { role: "user" as const, content },
-      ];
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
 
       try {
-        let accumulated = "";
-
-        const generator = streamChat(
-          settings.ollamaHost,
-          {
-            model: conversation.model,
-            messages: history,
-            stream: true,
-            options: { temperature: settings.temperature },
-          },
+        await streamResponse(
+          conversationId,
+          assistantId,
+          history,
+          model,
+          settings,
+          priorImageUrls,
           abortRef.current.signal,
-          settings.apiKey
+          updateMessage
         );
-
-        for await (const chunk of generator) {
-          if (chunk.message?.content) {
-            accumulated += chunk.message.content;
-            updateMessage(conversationId, assistantId, {
-              content: accumulated,
-              isStreaming: !chunk.done,
-            });
-          }
-          if (chunk.done) {
-            updateMessage(conversationId, assistantId, {
-              content: accumulated,
-              isStreaming: false,
-            });
-            break;
-          }
-        }
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") {
           updateMessage(conversationId, assistantId, { isStreaming: false });
@@ -99,8 +164,70 @@ export function useChat(conversationId: string | null) {
         }
       }
     },
-    [conversationId, conversation, settings, addMessage, updateMessage]
+    [conversationId, settings, addMessage, updateMessage]
   );
 
-  return { sendMessage, stop, conversation };
+  const sendMessage = useCallback(
+    async (content: string, attachments: MessageAttachment[] = []) => {
+      if (!conversationId || !conversation) return;
+      if (!conversation.model) return;
+
+      const hasContent =
+        content.trim().length > 0 || attachments.length > 0;
+      if (!hasContent) return;
+
+      addMessage(conversationId, {
+        role: "user",
+        content: content.trim(),
+        timestamp: Date.now(),
+        attachments: attachments.length ? attachments : undefined,
+      });
+
+      const userApiMessage: OllamaChatMessage = {
+        role: "user",
+        content: buildMessageContent(content.trim(), attachments),
+        ...(extractImages(attachments).length
+          ? { images: extractImages(attachments) }
+          : {}),
+      };
+
+      const history: OllamaChatMessage[] = [
+        ...conversation.messages.map(toApiMessage),
+        userApiMessage,
+      ];
+
+      const priorImageUrls = collectPriorImageUrls(conversation.messages);
+      await runStream(history, conversation.model, priorImageUrls);
+    },
+    [conversationId, conversation, addMessage, runStream]
+  );
+
+  const regenerate = useCallback(async () => {
+    if (!conversationId || !conversation?.model) return;
+
+    const msgs = conversation.messages;
+    let lastAssistantIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "assistant") {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistantIdx === -1) return;
+
+    const prior = msgs.slice(0, lastAssistantIdx);
+    deleteMessage(conversationId, msgs[lastAssistantIdx].id);
+
+    const history: OllamaChatMessage[] = prior.map(toApiMessage);
+    const priorImageUrls = collectPriorImageUrls(prior);
+
+    await runStream(history, conversation.model, priorImageUrls);
+  }, [
+    conversationId,
+    conversation,
+    deleteMessage,
+    runStream,
+  ]);
+
+  return { sendMessage, stop, regenerate, conversation };
 }
