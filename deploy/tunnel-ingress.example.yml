@@ -1,0 +1,15 @@
+# Add to your existing Cloudflare Tunnel on the WINDOWS PC
+# (Zero Trust dashboard → Networks → Tunnels → Configure → Public Hostname,
+#  or merge into %USERPROFILE%\.cloudflared\config.yml).
+#
+# Put the redstone rule BEFORE any catch-all (http_status:404).
+
+ingress:
+  # Existing — keep on your PC:
+  # - hostname: ollama.deoxylabs.com
+  #   service: http://127.0.0.1:11434
+
+  - hostname: redstone.deoxylabs.com
+    service: http://127.0.0.1:3000
+
+  - service: http_status:404
