@@ -43,7 +43,7 @@ export function ModelPicker({
   const [pos, setPos] = useState({ top: 0, left: 0, width: 300, above: true });
   const anchorRef = useRef<HTMLButtonElement>(null);
   const { setSettingsOpen } = useAppStore();
-  const { models, loading, error, resolvedHost, refresh } = useModels();
+  const { models, loading, error, refresh } = useModels();
 
   useEffect(() => {
     if (variant === "panel") refresh();
@@ -196,7 +196,6 @@ export function ModelPicker({
               {loading
                 ? "Loading…"
                 : `${models.length} model${models.length === 1 ? "" : "s"}`}
-              {resolvedHost ? ` · via ${resolvedHost}` : ""}
             </span>
           </div>
           <div className="relative">

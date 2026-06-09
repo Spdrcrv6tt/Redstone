@@ -50,20 +50,14 @@ export type AgentStreamEvent =
   | { type: "meta"; meta: MessageSearchMeta }
   | { type: "chunk"; chunk: OllamaChatResponseChunk };
 
-export interface FetchModelsResult extends OllamaTagsResponse {
-  resolvedHost?: string;
-  modelCount?: number;
-}
-
 export async function fetchModels(
   host: string,
   apiKey = ""
-): Promise<FetchModelsResult> {
+): Promise<OllamaTagsResponse> {
   const res = await fetch("/api/models", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(proxyBody(host, apiKey)),
-    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -73,16 +67,7 @@ export async function fetchModels(
         `Failed to fetch models: ${res.status} ${res.statusText}`
     );
   }
-
-  const data = (await res.json()) as OllamaTagsResponse;
-  const resolvedHost = res.headers.get("x-redstone-ollama-host") ?? undefined;
-  const modelCountHeader = res.headers.get("x-redstone-model-count");
-  const modelCount =
-    modelCountHeader !== null
-      ? Number(modelCountHeader)
-      : data.models?.length;
-
-  return { ...data, resolvedHost, modelCount };
+  return res.json();
 }
 
 /** Chat with automatic Brave web search (server-side, not tool-calling). */

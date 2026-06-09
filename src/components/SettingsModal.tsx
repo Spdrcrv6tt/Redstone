@@ -189,10 +189,6 @@ export function SettingsModal() {
                       placeholder="http://localhost:11434"
                       spellCheck={false}
                     />
-                    <Hint>
-                      On the Windows server, Redstone auto-detects local Ollama at
-                      127.0.0.1:11434 even when this shows the tunnel URL.
-                    </Hint>
                   </Field>
 
                   <Field label="Ollama API key" icon={KeyRound}>

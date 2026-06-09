@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  configFromBodyAsync,
+  configFromBody,
   upstreamHeaders,
   CORS_HEADERS,
 } from "@/lib/proxy";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { host, apiKey } = await configFromBodyAsync(body);
+  const { host, apiKey } = configFromBody(body);
   const { _host: _, _apiKey: __, ...ollamaBody } = body as {
     _host?: string;
     _apiKey?: string;
