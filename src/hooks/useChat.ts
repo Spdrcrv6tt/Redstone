@@ -79,7 +79,10 @@ async function streamResponse(
     settings.apiKey,
     settings.braveApiKey,
     settings.systemPrompt,
-    priorImageUrls
+    priorImageUrls,
+    settings.searchMode,
+    settings.routerModel,
+    settings.debugMode
   );
 
   for await (const event of generator) {

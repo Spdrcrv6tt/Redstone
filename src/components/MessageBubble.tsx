@@ -6,9 +6,11 @@ import { Copy, Check, FileText, RotateCcw, Globe } from "lucide-react";
 import { LivePreview } from "@/components/LivePreview";
 import { AssistantArticle } from "@/components/AssistantArticle";
 import { SearchImagePreloader } from "@/components/SearchImages";
+import { DebugPanel } from "@/components/DebugPanel";
 import { cleanSearchResponse, plainSearchResponse } from "@/lib/search/citations";
 import { formatFileSize } from "@/lib/files";
 import { hasWebPreview } from "@/lib/markdown-code";
+import { useAppStore } from "@/lib/store";
 import type { Message } from "@/types";
 
 interface MessageBubbleProps {
@@ -23,6 +25,7 @@ export function MessageBubble({
   showRegenerate,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
+  const debugMode = useAppStore((s) => s.settings.debugMode);
   const isUser = message.role === "user";
   const previewId = `live-preview-${message.id}`;
   const showLivePreview =
@@ -46,6 +49,13 @@ export function MessageBubble({
   const isPending =
     message.isStreaming || (hasSearchImages && !imageReady);
   const canRevealBody = !!assistantContent && !isPending;
+  const searchRan = message.search?.searchDecision?.ran;
+  const pendingLabel =
+    searchRan === true
+      ? "Searching the web…"
+      : searchRan === false
+        ? "Generating…"
+        : "Thinking…";
 
   const copy = async () => {
     const text = !isUser && message.content
@@ -166,6 +176,9 @@ export function MessageBubble({
                       defaultOpen
                     />
                   )}
+                  {debugMode && message.search?.debug && (
+                    <DebugPanel message={message} search={message.search} />
+                  )}
                 </motion.div>
               ) : isPending ? (
                 <motion.div
@@ -177,7 +190,7 @@ export function MessageBubble({
                 >
                   <p className="text-[11px] text-muted flex items-center gap-1.5">
                     <Globe className="w-3 h-3 text-indigo-500 animate-pulse" />
-                    Searching the web…
+                    {pendingLabel}
                   </p>
                   <div className="flex gap-1.5">
                     {[0, 160, 320].map((delay) => (

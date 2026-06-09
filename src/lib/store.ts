@@ -56,6 +56,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiKey: "",
   braveApiKey: "",
   defaultModel: PREFERRED_DEFAULT_MODEL,
+  routerModel: "",
+  searchMode: "auto",
+  debugMode: false,
   streamResponses: true,
   systemPrompt: "",
   temperature: 0.7,
@@ -206,6 +209,10 @@ export const useAppStore = create<AppState>()(
             ...saved.settings,
             defaultModel:
               saved.settings?.defaultModel || DEFAULT_SETTINGS.defaultModel,
+            searchMode:
+              saved.settings?.searchMode || DEFAULT_SETTINGS.searchMode,
+            debugMode:
+              saved.settings?.debugMode ?? DEFAULT_SETTINGS.debugMode,
           },
         };
       },

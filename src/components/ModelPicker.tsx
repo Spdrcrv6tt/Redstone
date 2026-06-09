@@ -20,6 +20,8 @@ interface ModelPickerProps {
   /** compact = composer pill; panel = settings list */
   variant?: "compact" | "panel";
   className?: string;
+  allowEmpty?: boolean;
+  emptyLabel?: string;
 }
 
 export function ModelPicker({
@@ -27,6 +29,8 @@ export function ModelPicker({
   onChange,
   variant = "compact",
   className,
+  allowEmpty = false,
+  emptyLabel = "None",
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 300, above: true });
@@ -124,8 +128,27 @@ export function ModelPicker({
           </div>
         </div>
       )}
-      {!loading && models.length === 0 && !error && (
+      {!loading && models.length === 0 && !error && !allowEmpty && (
         <p className="px-4 py-3 text-xs text-muted">No models found</p>
+      )}
+      {allowEmpty && (
+        <button
+          type="button"
+          onClick={() => select("")}
+          className={[
+            "w-full flex items-start gap-3 px-3 py-2.5 mx-1 rounded-lg text-left transition-colors",
+            !value ? "bg-accent-muted" : "hover:bg-surface-hover",
+          ].join(" ")}
+        >
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm ${!value ? "text-primary font-medium" : "text-muted"}`}>
+              {emptyLabel}
+            </p>
+          </div>
+          {!value && (
+            <Check className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
+          )}
+        </button>
       )}
       {models.map((m) => (
         <button
@@ -161,7 +184,7 @@ export function ModelPicker({
       <div className={className}>
         <div className="flex items-center justify-between gap-3 mb-2.5 px-3 py-2 rounded-xl border border-theme bg-surface-muted">
           <span className="text-[13px] text-primary font-medium truncate">
-            {value || "No model selected"}
+            {value || (allowEmpty ? emptyLabel : "No model selected")}
           </span>
           <button
             type="button"

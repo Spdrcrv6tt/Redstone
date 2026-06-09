@@ -476,17 +476,18 @@ function parseImageResult(r: BraveImageResult): SearchImage | null {
 export async function executeSearch(
   webQuery: string,
   imagePlan: ImageSearchPlan | null,
-  apiKey: string
+  apiKey: string,
+  options?: { skipWeb?: boolean }
 ): Promise<BraveSearchBundle> {
   const bundle: BraveSearchBundle = { sources: [], images: [] };
 
-  if (!webQuery.trim()) return bundle;
-
-  try {
-    bundle.sources = await braveWebSearch(webQuery, apiKey, 8);
-  } catch (err) {
-    bundle.searchError =
-      err instanceof Error ? err.message : "Web search failed";
+  if (!options?.skipWeb && webQuery.trim()) {
+    try {
+      bundle.sources = await braveWebSearch(webQuery, apiKey, 8);
+    } catch (err) {
+      bundle.searchError =
+        err instanceof Error ? err.message : "Web search failed";
+    }
   }
 
   if (!imagePlan) return bundle;

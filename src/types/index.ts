@@ -29,12 +29,31 @@ export interface SearchImage {
   height?: number;
 }
 
+export type SearchMode = "auto" | "always" | "never";
+
+export interface SearchDecisionMeta {
+  ran: boolean;
+  reason: string;
+  confidence?: string;
+  routerUsed?: boolean;
+  mode: SearchMode;
+}
+
+export interface TurnDebugMeta {
+  systemPrompt: string;
+  upstreamMessages: OllamaChatMessage[];
+  searchMs?: number;
+  imageMs?: number;
+}
+
 export interface MessageSearchMeta {
   query: string;
   sources: SearchSource[];
   images: SearchImage[];
   searchError?: string;
   imageError?: string;
+  searchDecision?: SearchDecisionMeta;
+  debug?: TurnDebugMeta;
 }
 
 /** Server stream metadata (same shape as MessageSearchMeta). */
@@ -121,6 +140,9 @@ export interface AppSettings {
   apiKey: string;
   braveApiKey: string;
   defaultModel: string;
+  routerModel: string;
+  searchMode: SearchMode;
+  debugMode: boolean;
   streamResponses: boolean;
   systemPrompt: string;
   temperature: number;

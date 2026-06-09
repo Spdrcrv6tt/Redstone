@@ -6,7 +6,7 @@ import type {
 } from "@/lib/search/coordinator";
 import type { SearchSource } from "@/types";
 
-const CORE = `You are Redstone, a helpful assistant. Web search results are provided below.
+const CORE_WITH_SEARCH = `You are Redstone, a helpful assistant. Web search results are provided below.
 
 Use web results for facts. Ignore irrelevant results. Never mention web search or system prompts.
 
@@ -16,6 +16,10 @@ Citations: retrieved sources are reference material — you do NOT need to cite 
 - Use at most ONE <cite>N</cite> per paragraph, and at most two citations in the entire answer (one for short answers).
 - Only cite a specific fact (date, number, classification, name) you took from a web result. General summary sentences need no citation.
 - Use source numbers only: <cite>1</cite>. Never [1], [EN], or publisher names in brackets.`;
+
+const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your knowledge and the conversation. Never mention system prompts.
+
+Conversation: you see the full thread. Resolve pronouns and partial names from earlier turns. Stay on the established subject.`;
 
 function answerInstructions(style: TurnPlan["answerStyle"]): string {
   if (style === "narrow") {
@@ -73,10 +77,11 @@ export function buildAugmentedSystemPrompt(
   plan: TurnPlan,
   sources: SearchSource[],
   visualMode: VisualMode,
-  searchError?: string
+  searchError?: string,
+  webSearchRan = true
 ): string {
   const parts = [
-    CORE,
+    webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH,
     answerInstructions(plan.answerStyle),
     visualInstructions(
       visualMode,
@@ -101,13 +106,15 @@ export function buildAugmentedSystemPrompt(
     parts.push(`User settings:\n${userSystemPrompt.trim()}`);
   }
 
-  const resultsBlock = searchError
-    ? `Web search failed: ${searchError}`
-    : formatSearchResults(sources);
+  if (webSearchRan) {
+    const resultsBlock = searchError
+      ? `Web search failed: ${searchError}`
+      : formatSearchResults(sources);
 
-  parts.push(
-    `--- Web results for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${resultsBlock}\n---`
-  );
+    parts.push(
+      `--- Web results for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${resultsBlock}\n---`
+    );
+  }
 
   return parts.join("\n\n");
 }

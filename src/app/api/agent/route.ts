@@ -12,14 +12,25 @@ import {
 } from "@/lib/search/brave";
 import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
 import { buildAugmentedSystemPrompt } from "@/lib/search/prompt";
+import { routerWantsSearch } from "@/lib/search/router";
 import type { OllamaChatMessage } from "@/types";
-import type { AgentStreamMeta } from "@/types";
+import type { AgentStreamMeta, SearchMode } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function lastAssistantSnippet(messages: OllamaChatMessage[]): string {
+  const last = [...messages].reverse().find((m) => m.role === "assistant");
+  return last?.content?.trim() ?? "";
+}
+
+function parseSearchMode(value: unknown): SearchMode {
+  if (value === "always" || value === "never" || value === "auto") return value;
+  return "auto";
 }
 
 export async function POST(req: NextRequest) {
@@ -37,6 +48,9 @@ export async function POST(req: NextRequest) {
     _braveApiKey,
     _systemPrompt,
     _priorImageUrls,
+    _searchMode,
+    _routerModel,
+    _debugMode,
     ...ollamaBody
   } = body as {
     _host?: string;
@@ -44,6 +58,9 @@ export async function POST(req: NextRequest) {
     _braveApiKey?: string;
     _systemPrompt?: string;
     _priorImageUrls?: string[];
+    _searchMode?: SearchMode;
+    _routerModel?: string;
+    _debugMode?: boolean;
     model?: string;
     messages?: OllamaChatMessage[];
     [key: string]: unknown;
@@ -68,11 +85,17 @@ export async function POST(req: NextRequest) {
   const priorImageUrls = Array.isArray(_priorImageUrls)
     ? _priorImageUrls.filter((u): u is string => typeof u === "string")
     : [];
+  const searchMode = parseSearchMode(_searchMode);
+  const routerModel =
+    typeof _routerModel === "string" ? _routerModel.trim() : "";
+  const debugMode = _debugMode === true;
 
   let sources: AgentStreamMeta["sources"] = [];
   let images: AgentStreamMeta["images"] = [];
   let searchError: string | undefined;
   let imageError: string | undefined;
+  let searchMs: number | undefined;
+  let imageMs: number | undefined;
 
   const draftPlan = planTurn(
     conversationMessages,
@@ -81,7 +104,43 @@ export async function POST(req: NextRequest) {
     priorImageUrls
   );
 
-  if (draftPlan.webSearchQuery) {
+  let runWebSearch = draftPlan.needsWebSearch;
+  let searchReason = draftPlan.searchDecision.reason;
+  let searchConfidence = draftPlan.searchDecision.confidence;
+  let routerUsed = false;
+
+  if (searchMode === "always") {
+    runWebSearch = true;
+    searchReason = "search mode: always";
+    searchConfidence = "high";
+  } else if (searchMode === "never") {
+    runWebSearch = false;
+    searchReason = "search mode: never";
+    searchConfidence = "high";
+  } else if (
+    !runWebSearch &&
+    searchConfidence === "low" &&
+    routerModel
+  ) {
+    const wants = await routerWantsSearch(
+      host,
+      apiKey,
+      routerModel,
+      rawUserQuery,
+      lastAssistantSnippet(conversationMessages)
+    );
+    routerUsed = true;
+    if (wants) {
+      runWebSearch = true;
+      searchReason = "router model: YES";
+      searchConfidence = "low";
+    } else {
+      searchReason = "router model: NO";
+    }
+  }
+
+  if (runWebSearch && draftPlan.webSearchQuery && braveKey) {
+    const t0 = Date.now();
     try {
       if (draftPlan.exhaustiveList) {
         const queries = [
@@ -103,6 +162,9 @@ export async function POST(req: NextRequest) {
       searchError =
         err instanceof Error ? err.message : "Web search failed";
     }
+    searchMs = Date.now() - t0;
+  } else if (runWebSearch && !braveKey) {
+    searchError = "Brave Search API key is not configured";
   }
 
   const turnPlan = planTurn(
@@ -112,15 +174,18 @@ export async function POST(req: NextRequest) {
     priorImageUrls
   );
 
-  if (turnPlan.imageSearch) {
+  if (turnPlan.imageSearch && braveKey) {
+    const t0 = Date.now();
     const withImages = await executeSearch(
       turnPlan.webSearchQuery,
       turnPlan.imageSearch,
-      braveKey
+      braveKey,
+      { skipWeb: sources.length > 0 || !runWebSearch }
     );
     images = withImages.images;
     imageError = withImages.imageError;
-    if (!sources.length) sources = withImages.sources;
+    if (!sources.length && runWebSearch) sources = withImages.sources;
+    imageMs = Date.now() - t0;
   }
 
   const visualMode = finalizeVisualMode(turnPlan, images.length);
@@ -130,7 +195,8 @@ export async function POST(req: NextRequest) {
     turnPlan,
     sources,
     visualMode,
-    searchError
+    searchError,
+    runWebSearch
   );
 
   const upstreamMessages: OllamaChatMessage[] = [
@@ -169,9 +235,26 @@ export async function POST(req: NextRequest) {
     const meta: AgentStreamMeta = {
       sources,
       images,
-      query: turnPlan.webSearchQuery,
+      query: runWebSearch ? turnPlan.webSearchQuery : "",
+      searchDecision: {
+        ran: runWebSearch,
+        reason: searchReason,
+        confidence: searchConfidence,
+        routerUsed,
+        mode: searchMode,
+      },
       ...(searchError ? { searchError } : {}),
       ...(imageError ? { imageError } : {}),
+      ...(debugMode
+        ? {
+            debug: {
+              systemPrompt: systemContent,
+              upstreamMessages,
+              ...(searchMs !== undefined ? { searchMs } : {}),
+              ...(imageMs !== undefined ? { imageMs } : {}),
+            },
+          }
+        : {}),
     };
 
     const encoder = new TextEncoder();

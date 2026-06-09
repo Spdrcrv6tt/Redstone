@@ -15,9 +15,11 @@ import {
   Moon,
   Cpu,
   Globe,
+  Bug,
+  Route,
 } from "lucide-react";
 import { ModelPicker } from "@/components/ModelPicker";
-import type { Theme } from "@/types";
+import type { SearchMode, Theme } from "@/types";
 import { useAppStore } from "@/lib/store";
 import type { AppSettings } from "@/types";
 
@@ -34,6 +36,9 @@ export function SettingsModal() {
         ...settings,
         displayName: settings.displayName ?? "",
         braveApiKey: settings.braveApiKey ?? "",
+        routerModel: settings.routerModel ?? "",
+        searchMode: settings.searchMode ?? "auto",
+        debugMode: settings.debugMode ?? false,
       });
     }
   }, [settingsOpen, settings]);
@@ -245,11 +250,94 @@ export function SettingsModal() {
                       </button>
                     </div>
                     <Hint>
-                      Web search runs automatically before every response. Can also
-                      be set via BRAVE_SEARCH_API_KEY on the server.
+                      Required for web search when enabled. Can also be set via
+                      BRAVE_SEARCH_API_KEY on the server.
                     </Hint>
                   </Field>
                 </div>
+              </section>
+
+              <div className="settings-divider" />
+
+              <section>
+                <p className="settings-section-title">Web search</p>
+                <div className="space-y-4">
+                  <Field label="Search mode" icon={Globe}>
+                    <div className="segmented-control">
+                      {(
+                        [
+                          ["auto", "Auto"],
+                          ["always", "Always"],
+                          ["never", "Never"],
+                        ] as const
+                      ).map(([mode, label]) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() =>
+                            setLocal((l) => ({
+                              ...l,
+                              searchMode: mode as SearchMode,
+                            }))
+                          }
+                          className={[
+                            "segmented-option",
+                            local.searchMode === mode
+                              ? "segmented-option-active"
+                              : "",
+                          ].join(" ")}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <Hint>
+                      Auto skips search for greetings, coding, and general chat.
+                      Always runs Brave on every message. Never skips web search
+                      entirely.
+                    </Hint>
+                  </Field>
+
+                  <Field label="Router model (optional)" icon={Route}>
+                    <ModelPicker
+                      variant="panel"
+                      value={local.routerModel}
+                      onChange={(name) =>
+                        setLocal((l) => ({ ...l, routerModel: name }))
+                      }
+                      allowEmpty
+                      emptyLabel="None — heuristics only"
+                    />
+                    <Hint>
+                      Small fast model (e.g. gemma4:2b) consulted only when
+                      heuristics are uncertain. Adds ~1s on those turns.
+                    </Hint>
+                  </Field>
+                </div>
+              </section>
+
+              <div className="settings-divider" />
+
+              <section>
+                <p className="settings-section-title">Developer</p>
+                <Field label="Debug mode" icon={Bug}>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={local.debugMode}
+                      onChange={(e) =>
+                        setLocal((l) => ({
+                          ...l,
+                          debugMode: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded border-theme accent-indigo-500"
+                    />
+                    <span className="text-sm text-secondary">
+                      Show raw model I/O and search decisions per message
+                    </span>
+                  </label>
+                </Field>
               </section>
 
               <div className="settings-divider" />
@@ -293,8 +381,8 @@ export function SettingsModal() {
                       placeholder="You are a helpful assistant…"
                     />
                     <Hint>
-                      Optional extra instructions. Web search context is added
-                      automatically — you don&apos;t need to ask the model to search.
+                      Optional extra instructions. Web search context is added when
+                      search runs — you don&apos;t need to ask the model to search.
                     </Hint>
                   </Field>
                 </div>

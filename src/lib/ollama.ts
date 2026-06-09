@@ -3,6 +3,7 @@ import type {
   OllamaChatRequest,
   OllamaChatResponseChunk,
   MessageSearchMeta,
+  SearchMode,
 } from "@/types";
 
 /**
@@ -18,6 +19,9 @@ function proxyBody(
     braveApiKey?: string;
     systemPrompt?: string;
     priorImageUrls?: string[];
+    searchMode?: SearchMode;
+    routerModel?: string;
+    debugMode?: boolean;
   }
 ) {
   return {
@@ -30,6 +34,13 @@ function proxyBody(
     ...(extras?.priorImageUrls?.length
       ? { _priorImageUrls: extras.priorImageUrls }
       : {}),
+    ...(extras?.searchMode !== undefined
+      ? { _searchMode: extras.searchMode }
+      : {}),
+    ...(extras?.routerModel !== undefined
+      ? { _routerModel: extras.routerModel }
+      : {}),
+    ...(extras?.debugMode !== undefined ? { _debugMode: extras.debugMode } : {}),
   };
 }
 
@@ -65,7 +76,10 @@ export async function* streamAgent(
   apiKey = "",
   braveApiKey = "",
   systemPrompt = "",
-  priorImageUrls: string[] = []
+  priorImageUrls: string[] = [],
+  searchMode: SearchMode = "auto",
+  routerModel = "",
+  debugMode = false
 ): AsyncGenerator<AgentStreamEvent> {
   const res = await fetch("/api/agent", {
     method: "POST",
@@ -77,6 +91,9 @@ export async function* streamAgent(
         braveApiKey,
         systemPrompt,
         priorImageUrls,
+        searchMode,
+        routerModel,
+        debugMode,
       }),
     }),
     signal,

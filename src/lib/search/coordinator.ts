@@ -34,6 +34,14 @@ export interface ImageSearchPlan {
   excludeUrls: string[];
 }
 
+export type SearchConfidence = "high" | "low";
+
+export interface SearchDecision {
+  search: boolean;
+  reason: string;
+  confidence: SearchConfidence;
+}
+
 export interface TurnPlan {
   rawUserQuery: string;
   webSearchQuery: string;
@@ -44,6 +52,8 @@ export interface TurnPlan {
   threadSubject: string | null;
   explicitVisualRequest: boolean;
   exhaustiveList: boolean;
+  needsWebSearch: boolean;
+  searchDecision: SearchDecision;
 }
 
 /* ─── Entity extraction ─────────────────────────────────────────────────── */
@@ -358,6 +368,110 @@ function classifyIntent(query: string): Intent {
   if (OBJECT_VISUAL.test(q)) return "object_visual";
   if (FOLLOW_UP.test(q)) return "follow_up";
   return "general";
+}
+
+/* ─── Web search gating ─────────────────────────────────────────────────── */
+
+const EXPLICIT_SEARCH =
+  /\b(?:search(?:\s+the\s+web)?|look\s+up|google|find\s+out|latest|current|breaking|news|today|this\s+week|recent(?:ly)?|as\s+of\s+\d{4}|up\s+to\s+date)\b/i;
+
+const SKIP_SEARCH =
+  /^(?:hi|hello|hey|thanks|thank\s+you|ok(?:ay)?|yes|no|sure|got\s+it|cool|nice)\b[!.,?\s]*$/i;
+
+const CREATIVE_OR_LOCAL =
+  /\b(?:write|rewrite|draft|compose|poem|story|joke|roleplay|translate|summarize\s+this|proofread|fix\s+this\s+code|debug|implement|refactor|explain\s+like|in\s+python|in\s+javascript|calculate|solve|what\s+is\s+\d+\s*[\+\-\*\/])\b/i;
+
+function hasNamedAnchor(query: string): boolean {
+  return (
+    /\b[A-Z][a-z]+ [A-Z][a-z]+\b/.test(query) ||
+    /\b[A-Za-z]+ [IVXLCDM]{1,6}\b/.test(query) ||
+    /\b(?:USS|USNS|HMS|RV)\s+[\w]/i.test(query) ||
+    /\bSL-1\b/i.test(query)
+  );
+}
+
+/** Heuristic: does this turn need a Brave web search? */
+export function decideWebSearch(
+  query: string,
+  memory: ConversationMemory,
+  intent: Intent,
+  exhaustiveList: boolean
+): SearchDecision {
+  const q = query.trim();
+  if (!q) {
+    return { search: false, reason: "empty query", confidence: "high" };
+  }
+
+  if (exhaustiveList) {
+    return { search: true, reason: "exhaustive list", confidence: "high" };
+  }
+
+  if (EXPLICIT_SEARCH.test(q)) {
+    return { search: true, reason: "explicit search intent", confidence: "high" };
+  }
+
+  if (SKIP_SEARCH.test(q)) {
+    return { search: false, reason: "conversational", confidence: "high" };
+  }
+
+  if (CREATIVE_OR_LOCAL.test(q)) {
+    return { search: false, reason: "creative or local task", confidence: "high" };
+  }
+
+  if (intent === "person_who" || intent === "explicit_visual") {
+    return {
+      search: true,
+      reason: "person or explicit visual request",
+      confidence: "high",
+    };
+  }
+
+  if (intent === "object_visual" && !hasNamedAnchor(q)) {
+    return {
+      search: true,
+      reason: "object topic without anchor in query",
+      confidence: "high",
+    };
+  }
+
+  if (needsWebContext(q)) {
+    return {
+      search: true,
+      reason: "contextual follow-up or pronoun",
+      confidence: "high",
+    };
+  }
+
+  if (
+    /\b(?:tell me about|what is|what was|who is|who was|describe|explain)\b/i.test(
+      q
+    ) &&
+    (hasNamedAnchor(q) || PHYSICAL_NOUN.test(q))
+  ) {
+    return { search: true, reason: "entity lookup", confidence: "high" };
+  }
+
+  if (NARROW_FACT.test(q)) {
+    return { search: true, reason: "narrow factual question", confidence: "high" };
+  }
+
+  if (memory.lastFocus && q.split(/\s+/).length <= 8) {
+    return {
+      search: false,
+      reason: "short follow-up on established topic",
+      confidence: "high",
+    };
+  }
+
+  if (q.split(/\s+/).length <= 4 && !hasNamedAnchor(q)) {
+    return { search: false, reason: "short general message", confidence: "high" };
+  }
+
+  return {
+    search: false,
+    reason: "no search signals — answering from model knowledge",
+    confidence: "low",
+  };
 }
 
 /* ─── Web search query ──────────────────────────────────────────────────── */
@@ -693,6 +807,7 @@ export function planTurn(
   }
 
   const explicitVisualRequest = intent === "explicit_visual";
+  const searchDecision = decideWebSearch(raw, memory, intent, exhaustiveList);
 
   let answerStyle: AnswerStyle = "standard";
   if (exhaustiveList) {
@@ -748,6 +863,8 @@ export function planTurn(
     threadSubject,
     explicitVisualRequest,
     exhaustiveList,
+    needsWebSearch: searchDecision.search,
+    searchDecision,
   };
 }
 
