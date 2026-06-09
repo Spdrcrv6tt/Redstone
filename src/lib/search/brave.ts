@@ -1,12 +1,13 @@
 import {
+  proxiedImagePath,
+  remoteUrlFromProxy,
+  verifyRemoteImageUrl,
+} from "@/lib/image-proxy";
+import {
   type ImageSearchPlan,
   personNamesInText,
 } from "@/lib/search/coordinator";
 import type { SearchImage, SearchSource } from "@/types";
-
-function proxiedImageUrl(origin: string, remoteUrl: string): string {
-  return `${origin}/api/image-proxy?url=${encodeURIComponent(remoteUrl)}`;
-}
 
 const BRAVE_WEB = "https://api.search.brave.com/res/v1/web/search";
 const BRAVE_IMAGES = "https://api.search.brave.com/res/v1/images/search";
@@ -172,7 +173,6 @@ export async function braveWebSearch(
 export async function braveImageSearch(
   query: string,
   apiKey: string,
-  origin: string,
   count = 8
 ): Promise<SearchImage[]> {
   const q = query.trim();
@@ -199,7 +199,7 @@ export async function braveImageSearch(
   const data = (await res.json()) as { results?: BraveImageResult[] };
 
   return (data.results ?? [])
-    .map((r) => parseImageResult(r, origin))
+    .map((r) => parseImageResult(r))
     .filter((img): img is SearchImage => img !== null);
 }
 
@@ -267,6 +267,13 @@ function scoreImage(img: SearchImage, plan: ImageSearchPlan): number {
     if (hay.includes(person.toLowerCase())) score -= 38;
   }
 
+  if (!plan.preferPortrait) {
+    const area = imageArea(img.width, img.height);
+    if (area >= 120_000) score += 24;
+    else if (area >= 50_000) score += 12;
+    else if (area > 0 && area < 36_000) score -= 20;
+  }
+
   if (plan.preferPortrait && plan.personNames[0]) {
     const target = plan.personNames[0].toLowerCase();
     const hasFullName = hay.includes(target);
@@ -332,7 +339,17 @@ function dedupeSimilar(images: SearchImage[]): SearchImage[] {
   return kept;
 }
 
-function pickBestImage(
+function imageArea(width?: number, height?: number): number {
+  return (width ?? 0) * (height ?? 0);
+}
+
+function looksLikeTinyThumb(url: string, width?: number, height?: number): boolean {
+  const area = imageArea(width, height);
+  if (area > 0 && area < 36_000) return true;
+  return /thumbs\.|_small\d*\.|\/thumb(?:\/|s\/)/i.test(url);
+}
+
+function rankImages(
   candidates: SearchImage[],
   plan: ImageSearchPlan
 ): SearchImage[] {
@@ -344,35 +361,114 @@ function pickBestImage(
     .filter(({ score }) => score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score);
 
-  if (ranked.length > 0) return [ranked[0].img];
+  if (ranked.length > 0) return ranked.map(({ img }) => img);
 
-  // Topic/object images often have sparse titles — take best non-stock match.
   if (!plan.preferPortrait && eligible.length > 0) {
-    const fallback = eligible
+    return eligible
       .map((img) => ({ img, score: scoreImage(img, plan) }))
       .filter(({ img, score }) => score > 0 && !isStock(img.sourceUrl))
-      .sort((a, b) => b.score - a.score);
-    if (fallback.length > 0) return [fallback[0].img];
+      .sort((a, b) => b.score - a.score)
+      .map(({ img }) => img);
   }
 
   return [];
 }
 
-function parseImageResult(
-  r: BraveImageResult,
-  origin: string
-): SearchImage | null {
-  const rawImage = r.properties?.url ?? r.thumbnail?.src;
-  const rawThumb = r.thumbnail?.src ?? r.properties?.url;
+function remotesForImage(img: SearchImage): string[] {
+  const out: string[] = [];
+  for (const proxy of [img.imageUrl, img.thumbnailUrl]) {
+    const remote = remoteUrlFromProxy(proxy);
+    if (remote && !out.includes(remote)) out.push(remote);
+  }
+  return out;
+}
+
+async function resolveVerifiedImages(
+  candidates: SearchImage[],
+  plan: ImageSearchPlan
+): Promise<SearchImage[]> {
+  const ranked = rankImages(candidates, plan);
+  const verified: {
+    img: SearchImage;
+    remote: string;
+    area: number;
+    score: number;
+  }[] = [];
+
+  for (const img of ranked.slice(0, 10)) {
+    const score = scoreImage(img, plan);
+    for (const remote of remotesForImage(img)) {
+      if (!(await verifyRemoteImageUrl(remote))) continue;
+      verified.push({
+        img,
+        remote,
+        area: imageArea(img.width, img.height),
+        score,
+      });
+      break;
+    }
+  }
+
+  if (!verified.length) return [];
+
+  verified.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return b.area - a.area;
+  });
+
+  const best = verified[0];
+  const thumbRemote =
+    remoteUrlFromProxy(best.img.thumbnailUrl) ??
+    remoteUrlFromProxy(best.img.imageUrl) ??
+    best.remote;
+
+  return [
+    {
+      ...best.img,
+      imageUrl: proxiedImagePath(best.remote),
+      thumbnailUrl: proxiedImagePath(thumbRemote),
+    },
+  ];
+}
+
+function parseImageResult(r: BraveImageResult): SearchImage | null {
+  const propsUrl = r.properties?.url;
+  const thumbUrl = r.thumbnail?.src;
+  let rawImage = propsUrl ?? thumbUrl;
+  let rawThumb = thumbUrl ?? propsUrl;
+
+  if (propsUrl && thumbUrl) {
+    const propsTiny = looksLikeTinyThumb(
+      propsUrl,
+      r.properties?.width,
+      r.properties?.height
+    );
+    const thumbArea = imageArea(r.thumbnail?.width, r.thumbnail?.height);
+    const propsArea = imageArea(r.properties?.width, r.properties?.height);
+    if (propsTiny || (thumbArea > propsArea && thumbArea > 0)) {
+      rawImage = thumbUrl;
+      rawThumb = propsUrl;
+    }
+  }
+
   if (!rawImage) return null;
+
+  const width =
+    rawImage === thumbUrl
+      ? (r.thumbnail?.width ?? r.properties?.width)
+      : (r.properties?.width ?? r.thumbnail?.width);
+  const height =
+    rawImage === thumbUrl
+      ? (r.thumbnail?.height ?? r.properties?.height)
+      : (r.properties?.height ?? r.thumbnail?.height);
 
   return {
     title: r.title?.trim() || r.source || "Image",
-    imageUrl: proxiedImageUrl(origin, rawImage),
-    thumbnailUrl: proxiedImageUrl(origin, rawThumb ?? rawImage),
+    imageUrl: proxiedImagePath(rawImage),
+    thumbnailUrl: proxiedImagePath(rawThumb ?? rawImage),
     sourceUrl: r.url ?? "",
-    width: r.properties?.width ?? r.thumbnail?.width,
-    height: r.properties?.height ?? r.thumbnail?.height,
+    width,
+    height,
   };
 }
 
@@ -380,8 +476,7 @@ function parseImageResult(
 export async function executeSearch(
   webQuery: string,
   imagePlan: ImageSearchPlan | null,
-  apiKey: string,
-  origin: string
+  apiKey: string
 ): Promise<BraveSearchBundle> {
   const bundle: BraveSearchBundle = { sources: [], images: [] };
 
@@ -400,7 +495,7 @@ export async function executeSearch(
     const batches = await Promise.all(
       imagePlan.queries
         .slice(0, 2)
-        .map((q) => braveImageSearch(q, apiKey, origin, 8))
+        .map((q) => braveImageSearch(q, apiKey, 8))
     );
     const seen = new Set<string>();
     const flat = batches.flat().filter((img) => {
@@ -408,7 +503,7 @@ export async function executeSearch(
       seen.add(img.imageUrl);
       return true;
     });
-    bundle.images = pickBestImage(flat, imagePlan);
+    bundle.images = await resolveVerifiedImages(flat, imagePlan);
   } catch (err) {
     bundle.imageError =
       err instanceof Error ? err.message : "Image search failed";

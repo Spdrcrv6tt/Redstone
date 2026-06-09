@@ -65,7 +65,6 @@ export async function POST(req: NextRequest) {
   const braveKey = resolveBraveApiKey(
     typeof _braveApiKey === "string" ? _braveApiKey : undefined
   );
-  const origin = req.nextUrl.origin;
   const priorImageUrls = Array.isArray(_priorImageUrls)
     ? _priorImageUrls.filter((u): u is string => typeof u === "string")
     : [];
@@ -95,8 +94,7 @@ export async function POST(req: NextRequest) {
         const webOnly = await executeSearch(
           draftPlan.webSearchQuery,
           null,
-          braveKey,
-          origin
+          braveKey
         );
         sources = webOnly.sources;
         searchError = webOnly.searchError;
@@ -118,8 +116,7 @@ export async function POST(req: NextRequest) {
     const withImages = await executeSearch(
       turnPlan.webSearchQuery,
       turnPlan.imageSearch,
-      braveKey,
-      origin
+      braveKey
     );
     images = withImages.images;
     imageError = withImages.imageError;

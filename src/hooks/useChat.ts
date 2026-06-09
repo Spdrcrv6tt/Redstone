@@ -2,6 +2,7 @@
 
 import { useRef, useCallback } from "react";
 import { useAppStore } from "@/lib/store";
+import { remoteUrlFromProxy } from "@/lib/image-proxy";
 import { streamAgent } from "@/lib/ollama";
 import { buildMessageContent, extractImages } from "@/lib/files";
 import type {
@@ -16,9 +17,11 @@ function collectPriorImageUrls(messages: Message[]): string[] {
   const urls = new Set<string>();
   for (const m of messages) {
     for (const img of m.search?.images ?? []) {
-      urls.add(img.imageUrl);
+      for (const proxy of [img.imageUrl, img.thumbnailUrl]) {
+        const remote = remoteUrlFromProxy(proxy);
+        urls.add(remote ?? proxy);
+      }
       if (img.sourceUrl) urls.add(img.sourceUrl);
-      if (img.thumbnailUrl) urls.add(img.thumbnailUrl);
     }
   }
   return [...urls];

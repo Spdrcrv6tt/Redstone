@@ -39,16 +39,29 @@ function FigureImage({
   image: SearchImage;
   onFail: () => void;
 }) {
+  const [src, setSrc] = useState(image.imageUrl);
+  const [triedThumb, setTriedThumb] = useState(false);
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={image.imageUrl}
-      alt=""
-      role="presentation"
+      src={src}
+      alt={image.title || ""}
       className="search-image"
       loading="eager"
       decoding="async"
-      onError={onFail}
+      onError={() => {
+        if (
+          !triedThumb &&
+          image.thumbnailUrl &&
+          image.thumbnailUrl !== src
+        ) {
+          setTriedThumb(true);
+          setSrc(image.thumbnailUrl);
+          return;
+        }
+        onFail();
+      }}
     />
   );
 }
@@ -63,8 +76,9 @@ function SingleFigure({
   fallbacks: SearchImage[];
 }) {
   const [index, setIndex] = useState(0);
+  const [hidden, setHidden] = useState(false);
   const current = index === 0 ? image : fallbacks[index - 1];
-  if (!current) return null;
+  if (!current || hidden) return null;
 
   const layoutClass =
     layout === "float-right"
@@ -76,9 +90,14 @@ function SingleFigure({
   return (
     <figure className={`search-image-figure ${layoutClass}`}>
       <FigureImage
+        key={`${current.imageUrl}-${index}`}
         image={current}
         onFail={() => {
-          if (index < fallbacks.length) setIndex((i) => i + 1);
+          if (index < fallbacks.length) {
+            setIndex((i) => i + 1);
+            return;
+          }
+          setHidden(true);
         }}
       />
       <FigureCaption image={current} />

@@ -33,11 +33,19 @@ export function SearchImagePreloader({
 
     for (const img of targets) {
       const probe = new window.Image();
+      const tryThumb = () => {
+        if (img.thumbnailUrl && img.thumbnailUrl !== probe.src) {
+          probe.onerror = () => done();
+          probe.src = img.thumbnailUrl;
+          return;
+        }
+        done();
+      };
       probe.onload = () => {
         anyLoaded = true;
         done();
       };
-      probe.onerror = () => done();
+      probe.onerror = tryThumb;
       probe.src = img.imageUrl;
     }
 
