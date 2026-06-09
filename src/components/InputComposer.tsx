@@ -18,7 +18,6 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
-import { useModels } from "@/hooks/useModels";
 import { ModelPicker } from "@/components/ModelPicker";
 import { processFiles, formatFileSize, MAX_FILES } from "@/lib/files";
 import type { MessageAttachment } from "@/types";
@@ -55,7 +54,8 @@ export function InputComposer({
     conversations,
     updateConversationModel,
   } = useAppStore();
-  const { loading, error } = useModels();
+  const loading = useAppStore((s) => s.modelsLoading);
+  const error = useAppStore((s) => s.modelsError);
 
   const activeConv = conversations.find((c) => c.id === activeConversationId);
   const currentModel = activeConv?.model || settings.defaultModel;

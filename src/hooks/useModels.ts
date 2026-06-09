@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useAppStore, PREFERRED_DEFAULT_MODEL } from "@/lib/store";
 import { fetchModels } from "@/lib/ollama";
 import type { OllamaModel } from "@/types";
+
+let loadSeq = 0;
 
 function pickDefaultModel(models: OllamaModel[]): string | null {
   if (models.length === 0) return null;
@@ -13,63 +15,68 @@ function pickDefaultModel(models: OllamaModel[]): string | null {
   return preferred?.name ?? models[0].name;
 }
 
-export function useModels() {
+/** Shared loader — safe to call from bootstrap, settings save, or picker refresh. */
+export async function loadModelsFromOllama() {
+  const seq = ++loadSeq;
   const {
-    models,
-    modelsLoading,
-    modelsError,
     settings,
     setModels,
     setModelsLoading,
     setModelsError,
     updateSettings,
-  } = useAppStore();
+  } = useAppStore.getState();
 
-  const applyDefaultIfNeeded = useCallback(
-    (available: OllamaModel[]) => {
-      const { settings } = useAppStore.getState();
-      if (settings.defaultModel) return;
-      const name = pickDefaultModel(available);
+  setModelsLoading(true);
+  setModelsError(null);
+
+  try {
+    const data = await fetchModels(settings.ollamaHost, settings.apiKey);
+    if (seq !== loadSeq) return;
+
+    const list = Array.isArray(data.models) ? data.models : [];
+    setModels(list);
+
+    const { settings: current } = useAppStore.getState();
+    if (!current.defaultModel && list.length > 0) {
+      const name = pickDefaultModel(list);
       if (name) updateSettings({ defaultModel: name });
-    },
-    [updateSettings]
-  );
-
-  const refresh = useCallback(async () => {
-    setModelsLoading(true);
-    setModelsError(null);
-    try {
-      const data = await fetchModels(settings.ollamaHost, settings.apiKey);
-      setModels(data.models);
-      // Read fresh state after fetch — avoids overwriting a rehydrated default
-      // when an earlier in-flight request started before hydration finished.
-      applyDefaultIfNeeded(data.models);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setModelsError(msg);
-    } finally {
+    }
+  } catch (err: unknown) {
+    if (seq !== loadSeq) return;
+    const msg = err instanceof Error ? err.message : String(err);
+    setModelsError(msg);
+  } finally {
+    if (seq === loadSeq) {
       setModelsLoading(false);
     }
-  }, [
-    settings.ollamaHost,
-    settings.apiKey,
-    setModels,
-    setModelsLoading,
-    setModelsError,
-    applyDefaultIfNeeded,
-  ]);
+  }
+}
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+export function useModels() {
+  const models = useAppStore((s) => s.models);
+  const modelsLoading = useAppStore((s) => s.modelsLoading);
+  const modelsError = useAppStore((s) => s.modelsError);
 
-  useEffect(() => {
-    const unsub = useAppStore.persist.onFinishHydration(() => {
-      const { models } = useAppStore.getState();
-      if (models.length > 0) applyDefaultIfNeeded(models);
-    });
-    return unsub;
-  }, [applyDefaultIfNeeded]);
+  const refresh = useCallback(() => loadModelsFromOllama(), []);
 
   return { models, loading: modelsLoading, error: modelsError, refresh };
+}
+
+/** Call once after persisted settings hydrate — avoids racing with empty apiKey. */
+export function useModelsBootstrap() {
+  const ollamaHost = useAppStore((s) => s.settings.ollamaHost);
+  const apiKey = useAppStore((s) => s.settings.apiKey);
+  const booted = useRef(false);
+
+  const run = useCallback(() => {
+    void loadModelsFromOllama();
+  }, []);
+
+  const onHydrated = useCallback(() => {
+    if (booted.current) return;
+    booted.current = true;
+    run();
+  }, [run]);
+
+  return { onHydrated, ollamaHost, apiKey, run, booted };
 }

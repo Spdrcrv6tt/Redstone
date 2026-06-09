@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   configFromBody,
   configFromSearch,
-  upstreamHeaders,
   CORS_HEADERS,
 } from "@/lib/proxy";
+import { fetchMergedModelList } from "@/lib/ollama-hosts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,27 +13,27 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-async function fetchTags(host: string, apiKey: string) {
-  const upstream = await fetch(`${host}/api/tags`, {
-    method: "GET",
-    headers: upstreamHeaders(apiKey),
-  });
+async function fetchTags(clientHost: string, apiKey: string) {
+  const { models, sources } = await fetchMergedModelList(clientHost, apiKey);
 
-  if (!upstream.ok) {
-    const text = await upstream.text();
-    let errorBody: object;
-    try {
-      errorBody = JSON.parse(text);
-    } catch {
-      errorBody = {
-        error: `Ollama ${upstream.status}: ${text.slice(0, 300) || upstream.statusText}`,
-      };
-    }
-    return NextResponse.json(errorBody, { status: upstream.status });
+  if (models.length === 0) {
+    return NextResponse.json(
+      {
+        error: `No models found. Tried: ${sources.join(", ") || clientHost}`,
+      },
+      { status: 502 }
+    );
   }
 
-  const data = await upstream.json();
-  return NextResponse.json(data);
+  return NextResponse.json(
+    { models },
+    {
+      headers: {
+        "X-Redstone-Model-Count": String(models.length),
+        "X-Redstone-Ollama-Sources": sources.join(","),
+      },
+    }
+  );
 }
 
 /** Legacy GET via query params — no custom headers needed. */
@@ -43,16 +43,7 @@ export async function GET(req: NextRequest) {
     return await fetchTags(host, apiKey);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    const isConnRefused =
-      message.includes("ECONNREFUSED") || message.includes("fetch failed");
-    return NextResponse.json(
-      {
-        error: isConnRefused
-          ? `Cannot reach Ollama at ${host}. Is it running?`
-          : message,
-      },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }
 
@@ -71,15 +62,6 @@ export async function POST(req: NextRequest) {
     return await fetchTags(host, apiKey);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    const isConnRefused =
-      message.includes("ECONNREFUSED") || message.includes("fetch failed");
-    return NextResponse.json(
-      {
-        error: isConnRefused
-          ? `Cannot reach Ollama at ${host}. Is it running?`
-          : message,
-      },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

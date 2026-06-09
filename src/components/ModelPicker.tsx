@@ -46,10 +46,6 @@ export function ModelPicker({
   const { models, loading, error, refresh } = useModels();
 
   useEffect(() => {
-    if (variant === "panel") refresh();
-  }, [variant, refresh]);
-
-  useEffect(() => {
     setManual(value);
   }, [value]);
 
