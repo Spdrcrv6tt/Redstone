@@ -29,13 +29,29 @@ export interface SearchImage {
   height?: number;
 }
 
-export type SearchMode = "auto" | "always" | "never";
+export type SearchMode = "auto" | "always" | "never" | "aggressive";
+
+export type AgentStatusPhase = "orchestrate" | "web" | "image" | "generate";
+
+export interface AgentStatusMeta {
+  message: string;
+  phase: AgentStatusPhase;
+}
+
+export interface OrchestratorDecisionMeta {
+  webSearch: boolean;
+  webQuery: string;
+  imageSearch: boolean;
+  imageQuery: string;
+  reason: string;
+}
 
 export interface SearchDecisionMeta {
   ran: boolean;
   reason: string;
   confidence?: string;
   routerUsed?: boolean;
+  orchestrator?: OrchestratorDecisionMeta;
   mode: SearchMode;
 }
 
@@ -68,6 +84,8 @@ export interface Message {
   isStreaming?: boolean;
   error?: string;
   attachments?: MessageAttachment[];
+  /** Live pipeline status while the turn is in progress */
+  agentStatus?: AgentStatusMeta;
   /** Web search data for this assistant turn (not shown as a tool call) */
   search?: MessageSearchMeta;
 }

@@ -61,6 +61,7 @@ async function streamResponse(
 
   updateMessage(conversationId, assistantId, {
     search: { query: "", sources: [], images: [] },
+    agentStatus: undefined,
   });
 
   const generator = streamAgent(
@@ -86,9 +87,19 @@ async function streamResponse(
   );
 
   for await (const event of generator) {
+    if (event.type === "status") {
+      updateMessage(conversationId, assistantId, {
+        agentStatus: event.status,
+      });
+      continue;
+    }
+
     if (event.type === "meta") {
       searchMeta = event.meta;
-      updateMessage(conversationId, assistantId, { search: event.meta });
+      updateMessage(conversationId, assistantId, {
+        search: event.meta,
+        agentStatus: undefined,
+      });
       continue;
     }
 
@@ -99,6 +110,7 @@ async function streamResponse(
         content: accumulated,
         isStreaming: !chunk.done,
         search: searchMeta,
+        agentStatus: undefined,
       });
     }
     if (chunk.done) {
@@ -106,6 +118,7 @@ async function streamResponse(
         content: accumulated,
         isStreaming: false,
         search: searchMeta,
+        agentStatus: undefined,
       });
       break;
     }

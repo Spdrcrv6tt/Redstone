@@ -646,6 +646,32 @@ button.source-cite {
   }
 }
 
+/* ─── Agent status line ─────────────────────────────────────────────────── */
+.agent-status-line {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.25rem 0;
+}
+.agent-status-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.agent-status-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--text-muted);
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+.agent-status-text {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+}
+
 /* ─── Debug panel ───────────────────────────────────────────────────────── */
 .debug-panel {
   margin-top: 1.25rem;
@@ -1053,6 +1079,10 @@ button.source-cite {
   border-radius: 14px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
+}
+.segmented-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 .segmented-option {
   flex: 1;

@@ -189,6 +189,10 @@ export function SettingsModal() {
                       placeholder="http://localhost:11434"
                       spellCheck={false}
                     />
+                    <Hint>
+                      On the Windows server, Redstone auto-detects local Ollama at
+                      127.0.0.1:11434 even when this shows the tunnel URL.
+                    </Hint>
                   </Field>
 
                   <Field label="Ollama API key" icon={KeyRound}>
@@ -263,10 +267,11 @@ export function SettingsModal() {
                 <p className="settings-section-title">Web search</p>
                 <div className="space-y-4">
                   <Field label="Search mode" icon={Globe}>
-                    <div className="segmented-control">
+                    <div className="segmented-control segmented-control-grid">
                       {(
                         [
                           ["auto", "Auto"],
+                          ["aggressive", "Aggressive"],
                           ["always", "Always"],
                           ["never", "Never"],
                         ] as const
@@ -292,25 +297,38 @@ export function SettingsModal() {
                       ))}
                     </div>
                     <Hint>
-                      Auto skips search for greetings, coding, and general chat.
-                      Always runs Brave on every message. Never skips web search
-                      entirely.
+                      Auto uses fast heuristics. Aggressive runs the orchestrator
+                      model on every turn to plan web search and images. Always /
+                      Never force search on or off.
                     </Hint>
                   </Field>
 
-                  <Field label="Router model (optional)" icon={Route}>
+                  <Field
+                    label={
+                      local.searchMode === "aggressive"
+                        ? "Orchestrator model"
+                        : "Router model (optional)"
+                    }
+                    icon={Route}
+                  >
                     <ModelPicker
                       variant="panel"
                       value={local.routerModel}
                       onChange={(name) =>
                         setLocal((l) => ({ ...l, routerModel: name }))
                       }
-                      allowEmpty
-                      emptyLabel="None — heuristics only"
+                      allowEmpty={local.searchMode !== "aggressive"}
+                      emptyLabel={
+                        local.searchMode === "aggressive"
+                          ? "Required for aggressive mode"
+                          : "None — heuristics only"
+                      }
+                      allowManualEntry
                     />
                     <Hint>
-                      Small fast model (e.g. gemma4:2b) consulted only when
-                      heuristics are uncertain. Adds ~1s on those turns.
+                      {local.searchMode === "aggressive"
+                        ? "Small fast model (e.g. gemma4:2b) plans web search, images, and tools before the main model runs."
+                        : "Consulted when Auto mode is uncertain. Pick any installed model or type a name."}
                     </Hint>
                   </Field>
                 </div>

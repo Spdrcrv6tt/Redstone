@@ -6,6 +6,7 @@ import { Copy, Check, FileText, RotateCcw, Globe } from "lucide-react";
 import { LivePreview } from "@/components/LivePreview";
 import { AssistantArticle } from "@/components/AssistantArticle";
 import { SearchImagePreloader } from "@/components/SearchImages";
+import { AgentStatusLine } from "@/components/AgentStatusLine";
 import { DebugPanel } from "@/components/DebugPanel";
 import { cleanSearchResponse, plainSearchResponse } from "@/lib/search/citations";
 import { formatFileSize } from "@/lib/files";
@@ -49,13 +50,8 @@ export function MessageBubble({
   const isPending =
     message.isStreaming || (hasSearchImages && !imageReady);
   const canRevealBody = !!assistantContent && !isPending;
-  const searchRan = message.search?.searchDecision?.ran;
-  const pendingLabel =
-    searchRan === true
-      ? "Searching the web…"
-      : searchRan === false
-        ? "Generating…"
-        : "Thinking…";
+  const showStatus =
+    message.isStreaming && !assistantContent && message.agentStatus;
 
   const copy = async () => {
     const text = !isUser && message.content
@@ -183,27 +179,33 @@ export function MessageBubble({
               ) : isPending ? (
                 <motion.div
                   key="loading"
-                  className="py-2 space-y-2"
+                  className="py-2"
                   initial={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}
                 >
-                  <p className="text-[11px] text-muted flex items-center gap-1.5">
-                    <Globe className="w-3 h-3 text-indigo-500 animate-pulse" />
-                    {pendingLabel}
-                  </p>
-                  <div className="flex gap-1.5">
-                    {[0, 160, 320].map((delay) => (
-                      <span
-                        key={delay}
-                        className="w-2 h-2 rounded-full"
-                        style={{
-                          backgroundColor: "var(--text-muted)",
-                          animation: `dot-pulse 1.4s ease-in-out ${delay}ms infinite`,
-                        }}
-                      />
-                    ))}
-                  </div>
+                  {showStatus && message.agentStatus ? (
+                    <AgentStatusLine status={message.agentStatus} />
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-muted flex items-center gap-1.5">
+                        <Globe className="w-3 h-3 text-indigo-500 animate-pulse" />
+                        Thinking…
+                      </p>
+                      <div className="flex gap-1.5">
+                        {[0, 160, 320].map((delay) => (
+                          <span
+                            key={delay}
+                            className="w-2 h-2 rounded-full"
+                            style={{
+                              backgroundColor: "var(--text-muted)",
+                              animation: `dot-pulse 1.4s ease-in-out ${delay}ms infinite`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ) : null}
             </AnimatePresence>

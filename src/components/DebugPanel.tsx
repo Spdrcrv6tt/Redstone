@@ -80,6 +80,18 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
                 ? `Image time: ${debug.imageMs}ms`
                 : null,
               search?.query ? `Query: ${search.query}` : null,
+              decision.orchestrator
+                ? [
+                    `Orchestrator web: ${decision.orchestrator.webSearch}`,
+                    decision.orchestrator.webQuery
+                      ? `Orchestrator web query: ${decision.orchestrator.webQuery}`
+                      : null,
+                    `Orchestrator image: ${decision.orchestrator.imageSearch}`,
+                    decision.orchestrator.imageQuery
+                      ? `Orchestrator image query: ${decision.orchestrator.imageQuery}`
+                      : null,
+                  ].join("\n")
+                : null,
               `Sources: ${search?.sources.length ?? 0}`,
               `Images: ${search?.images.length ?? 0}`,
             ]

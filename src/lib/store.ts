@@ -16,6 +16,7 @@ interface AppState {
   models: OllamaModel[];
   modelsLoading: boolean;
   modelsError: string | null;
+  modelsResolvedHost: string | null;
 
   // settings
   settings: AppSettings;
@@ -38,6 +39,7 @@ interface AppState {
   setModels: (models: OllamaModel[]) => void;
   setModelsLoading: (loading: boolean) => void;
   setModelsError: (error: string | null) => void;
+  setModelsResolvedHost: (host: string | null) => void;
 
   updateConversationModel: (conversationId: string, model: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -73,6 +75,7 @@ export const useAppStore = create<AppState>()(
       models: [],
       modelsLoading: false,
       modelsError: null,
+      modelsResolvedHost: null,
       settings: DEFAULT_SETTINGS,
       theme: "light",
       sidebarExpanded: false,
@@ -173,6 +176,7 @@ export const useAppStore = create<AppState>()(
       setModels: (models) => set({ models }),
       setModelsLoading: (loading) => set({ modelsLoading: loading }),
       setModelsError: (error) => set({ modelsError: error }),
+      setModelsResolvedHost: (host) => set({ modelsResolvedHost: host }),
 
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),

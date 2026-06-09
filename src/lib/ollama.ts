@@ -2,6 +2,7 @@ import type {
   OllamaTagsResponse,
   OllamaChatRequest,
   OllamaChatResponseChunk,
+  AgentStatusMeta,
   MessageSearchMeta,
   SearchMode,
 } from "@/types";
@@ -45,17 +46,24 @@ function proxyBody(
 }
 
 export type AgentStreamEvent =
+  | { type: "status"; status: AgentStatusMeta }
   | { type: "meta"; meta: MessageSearchMeta }
   | { type: "chunk"; chunk: OllamaChatResponseChunk };
+
+export interface FetchModelsResult extends OllamaTagsResponse {
+  resolvedHost?: string;
+  modelCount?: number;
+}
 
 export async function fetchModels(
   host: string,
   apiKey = ""
-): Promise<OllamaTagsResponse> {
+): Promise<FetchModelsResult> {
   const res = await fetch("/api/models", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(proxyBody(host, apiKey)),
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -65,7 +73,16 @@ export async function fetchModels(
         `Failed to fetch models: ${res.status} ${res.statusText}`
     );
   }
-  return res.json();
+
+  const data = (await res.json()) as OllamaTagsResponse;
+  const resolvedHost = res.headers.get("x-redstone-ollama-host") ?? undefined;
+  const modelCountHeader = res.headers.get("x-redstone-model-count");
+  const modelCount =
+    modelCountHeader !== null
+      ? Number(modelCountHeader)
+      : data.models?.length;
+
+  return { ...data, resolvedHost, modelCount };
 }
 
 /** Chat with automatic Brave web search (server-side, not tool-calling). */
@@ -112,7 +129,7 @@ export async function* streamAgent(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let metaParsed = false;
+  let metaReceived = false;
 
   try {
     while (true) {
@@ -127,28 +144,49 @@ export async function* streamAgent(
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        if (!metaParsed) {
-          try {
-            const parsed = JSON.parse(trimmed) as {
-              redstone_meta?: MessageSearchMeta;
-            };
-            if (parsed.redstone_meta) {
-              yield { type: "meta", meta: parsed.redstone_meta };
-              metaParsed = true;
-              continue;
+        let parsed: Record<string, unknown> | null = null;
+        try {
+          parsed = JSON.parse(trimmed) as Record<string, unknown>;
+        } catch {
+          if (metaReceived) {
+            try {
+              const chunk: OllamaChatResponseChunk = JSON.parse(trimmed);
+              yield { type: "chunk", chunk };
+              if (chunk.done) return;
+            } catch {
+              /* skip */
             }
-          } catch {
-            // not meta line — fall through
           }
-          metaParsed = true;
+          continue;
         }
 
-        try {
-          const chunk: OllamaChatResponseChunk = JSON.parse(trimmed);
-          yield { type: "chunk", chunk };
-          if (chunk.done) return;
-        } catch {
-          // skip malformed lines
+        if (parsed.redstone_status) {
+          yield {
+            type: "status",
+            status: parsed.redstone_status as AgentStatusMeta,
+          };
+          continue;
+        }
+
+        if (parsed.redstone_meta) {
+          yield {
+            type: "meta",
+            meta: parsed.redstone_meta as MessageSearchMeta,
+          };
+          metaReceived = true;
+          continue;
+        }
+
+        if (parsed.error) {
+          throw new Error(String(parsed.error));
+        }
+
+        if (metaReceived) {
+          const chunk = parsed as unknown as OllamaChatResponseChunk;
+          if (chunk.message !== undefined) {
+            yield { type: "chunk", chunk };
+            if (chunk.done) return;
+          }
         }
       }
     }

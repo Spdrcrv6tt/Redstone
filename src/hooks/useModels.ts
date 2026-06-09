@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useAppStore, PREFERRED_DEFAULT_MODEL } from "@/lib/store";
 import { fetchModels } from "@/lib/ollama";
 import type { OllamaModel } from "@/types";
@@ -18,10 +18,12 @@ export function useModels() {
     models,
     modelsLoading,
     modelsError,
+    modelsResolvedHost,
     settings,
     setModels,
     setModelsLoading,
     setModelsError,
+    setModelsResolvedHost,
     updateSettings,
   } = useAppStore();
 
@@ -35,20 +37,29 @@ export function useModels() {
     [updateSettings]
   );
 
+  const refreshSeq = useRef(0);
+
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeq.current;
     setModelsLoading(true);
     setModelsError(null);
     try {
       const data = await fetchModels(settings.ollamaHost, settings.apiKey);
-      setModels(data.models);
+      if (seq !== refreshSeq.current) return;
+      const list = Array.isArray(data.models) ? data.models : [];
+      setModels(list);
+      setModelsResolvedHost(data.resolvedHost ?? null);
       // Read fresh state after fetch — avoids overwriting a rehydrated default
       // when an earlier in-flight request started before hydration finished.
-      applyDefaultIfNeeded(data.models);
+      applyDefaultIfNeeded(list);
     } catch (err: unknown) {
+      if (seq !== refreshSeq.current) return;
       const msg = err instanceof Error ? err.message : String(err);
       setModelsError(msg);
     } finally {
-      setModelsLoading(false);
+      if (seq === refreshSeq.current) {
+        setModelsLoading(false);
+      }
     }
   }, [
     settings.ollamaHost,
@@ -56,6 +67,7 @@ export function useModels() {
     setModels,
     setModelsLoading,
     setModelsError,
+    setModelsResolvedHost,
     applyDefaultIfNeeded,
   ]);
 
@@ -71,5 +83,11 @@ export function useModels() {
     return unsub;
   }, [applyDefaultIfNeeded]);
 
-  return { models, loading: modelsLoading, error: modelsError, refresh };
+  return {
+    models,
+    loading: modelsLoading,
+    error: modelsError,
+    resolvedHost: modelsResolvedHost,
+    refresh,
+  };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,10 +9,12 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  Search,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useModels } from "@/hooks/useModels";
 import { formatModelLabel, formatBytes } from "@/lib/utils";
+import type { OllamaModel } from "@/types";
 
 interface ModelPickerProps {
   value: string;
@@ -22,6 +24,8 @@ interface ModelPickerProps {
   className?: string;
   allowEmpty?: boolean;
   emptyLabel?: string;
+  /** Allow typing a model name not in the Ollama list */
+  allowManualEntry?: boolean;
 }
 
 export function ModelPicker({
@@ -31,12 +35,34 @@ export function ModelPicker({
   className,
   allowEmpty = false,
   emptyLabel = "None",
+  allowManualEntry = false,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [manual, setManual] = useState("");
   const [pos, setPos] = useState({ top: 0, left: 0, width: 300, above: true });
   const anchorRef = useRef<HTMLButtonElement>(null);
   const { setSettingsOpen } = useAppStore();
-  const { models, loading, error, refresh } = useModels();
+  const { models, loading, error, resolvedHost, refresh } = useModels();
+
+  useEffect(() => {
+    if (variant === "panel") refresh();
+  }, [variant, refresh]);
+
+  useEffect(() => {
+    setManual(value);
+  }, [value]);
+
+  const valueInList = useMemo(
+    () => models.some((m) => m.name === value),
+    [models, value]
+  );
+
+  const filteredModels = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return models;
+    return models.filter((m) => m.name.toLowerCase().includes(q));
+  }, [models, filter]);
 
   const updatePosition = useCallback(() => {
     const el = anchorRef.current;
@@ -91,8 +117,40 @@ export function ModelPicker({
 
   const select = (name: string) => {
     onChange(name);
+    setManual(name);
     setOpen(false);
   };
+
+  const renderModelRow = (m: OllamaModel) => (
+    <button
+      key={m.name}
+      type="button"
+      onClick={() => select(m.name)}
+      className={[
+        "w-full flex items-start gap-3 px-3 py-2.5 mx-1 rounded-lg text-left transition-colors",
+        m.name === value ? "bg-accent-muted" : "hover:bg-surface-hover",
+      ].join(" ")}
+    >
+      <div className="flex-1 min-w-0">
+        <p
+          className={`text-sm truncate ${m.name === value ? "text-primary font-medium" : "text-primary"}`}
+        >
+          {m.name}
+        </p>
+        {m.details?.parameter_size && (
+          <p className="text-[11px] text-muted mt-0.5">
+            {m.details.parameter_size} · {formatBytes(m.size)}
+          </p>
+        )}
+      </div>
+      {m.name === value && (
+        <Check
+          className="w-4 h-4 flex-shrink-0 mt-0.5"
+          style={{ color: "var(--accent)" }}
+        />
+      )}
+    </button>
+  );
 
   const listContent = (
     <>
@@ -107,6 +165,7 @@ export function ModelPicker({
           <p className="text-xs text-amber-600 leading-relaxed mb-2">{error}</p>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={() => refresh()}
               className="text-xs text-primary font-medium hover:underline"
             >
@@ -116,6 +175,7 @@ export function ModelPicker({
               error.includes("403") ||
               error.toLowerCase().includes("unauthorized")) && (
               <button
+                type="button"
                 onClick={() => {
                   setOpen(false);
                   setSettingsOpen(true);
@@ -128,9 +188,34 @@ export function ModelPicker({
           </div>
         </div>
       )}
+
+      {models.length > 4 && (
+        <div className="px-3 py-2 border-b border-theme">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-[11px] text-muted">
+              {loading
+                ? "Loading…"
+                : `${models.length} model${models.length === 1 ? "" : "s"}`}
+              {resolvedHost ? ` · via ${resolvedHost}` : ""}
+            </span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter models…"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-theme bg-surface-muted text-primary"
+            />
+          </div>
+        </div>
+      )}
+
       {!loading && models.length === 0 && !error && !allowEmpty && (
         <p className="px-4 py-3 text-xs text-muted">No models found</p>
       )}
+
       {allowEmpty && (
         <button
           type="button"
@@ -141,41 +226,43 @@ export function ModelPicker({
           ].join(" ")}
         >
           <div className="flex-1 min-w-0">
-            <p className={`text-sm ${!value ? "text-primary font-medium" : "text-muted"}`}>
+            <p
+              className={`text-sm ${!value ? "text-primary font-medium" : "text-muted"}`}
+            >
               {emptyLabel}
             </p>
           </div>
           {!value && (
-            <Check className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
+            <Check
+              className="w-4 h-4 flex-shrink-0 mt-0.5"
+              style={{ color: "var(--accent)" }}
+            />
           )}
         </button>
       )}
-      {models.map((m) => (
+
+      {value && !valueInList && (
         <button
-          key={m.name}
-          onClick={() => select(m.name)}
-          className={[
-            "w-full flex items-start gap-3 px-3 py-2.5 mx-1 rounded-lg text-left transition-colors",
-            m.name === value
-              ? "bg-accent-muted"
-              : "hover:bg-surface-hover",
-          ].join(" ")}
+          type="button"
+          onClick={() => select(value)}
+          className="w-full flex items-start gap-3 px-3 py-2.5 mx-1 rounded-lg text-left bg-accent-muted"
         >
           <div className="flex-1 min-w-0">
-            <p className={`text-sm truncate ${m.name === value ? "text-primary font-medium" : "text-primary"}`}>
-              {m.name}
-            </p>
-            {m.details?.parameter_size && (
-              <p className="text-[11px] text-muted mt-0.5">
-                {m.details.parameter_size} · {formatBytes(m.size)}
-              </p>
-            )}
+            <p className="text-sm text-primary font-medium truncate">{value}</p>
+            <p className="text-[11px] text-muted mt-0.5">Custom / not in list</p>
           </div>
-          {m.name === value && (
-            <Check className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
-          )}
+          <Check
+            className="w-4 h-4 flex-shrink-0 mt-0.5"
+            style={{ color: "var(--accent)" }}
+          />
         </button>
-      ))}
+      )}
+
+      {filteredModels.map(renderModelRow)}
+
+      {filter && filteredModels.length === 0 && models.length > 0 && (
+        <p className="px-4 py-3 text-xs text-muted">No models match &ldquo;{filter}&rdquo;</p>
+      )}
     </>
   );
 
@@ -192,12 +279,36 @@ export function ModelPicker({
             className="p-1.5 rounded-lg text-muted hover:text-primary btn-ghost flex-shrink-0"
             title="Refresh models"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
-        <div className="rounded-xl border border-theme bg-surface max-h-52 overflow-y-auto py-1">
+        <div className="rounded-xl border border-theme bg-surface max-h-80 overflow-y-auto py-1">
           {listContent}
         </div>
+        {allowManualEntry && (
+          <div className="mt-2.5">
+            <input
+              type="text"
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              onBlur={() => {
+                if (manual.trim() && manual.trim() !== value) {
+                  onChange(manual.trim());
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && manual.trim()) {
+                  onChange(manual.trim());
+                }
+              }}
+              placeholder="Or type model name (e.g. gemma4:2b)"
+              className="field-input font-mono text-[13px]"
+              spellCheck={false}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -220,7 +331,7 @@ export function ModelPicker({
               ...(pos.above
                 ? { bottom: window.innerHeight - pos.top }
                 : { top: pos.top }),
-              maxHeight: Math.min(360, window.innerHeight * 0.5),
+              maxHeight: Math.min(420, window.innerHeight * 0.55),
             }}
             initial={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

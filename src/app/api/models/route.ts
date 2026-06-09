@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  configFromBody,
-  configFromSearch,
+  configFromBodyAsync,
+  configFromSearchAsync,
   upstreamHeaders,
   CORS_HEADERS,
 } from "@/lib/proxy";
@@ -13,10 +13,19 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+const NO_CACHE = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  Pragma: "no-cache",
+} as const;
+
 async function fetchTags(host: string, apiKey: string) {
   const upstream = await fetch(`${host}/api/tags`, {
     method: "GET",
-    headers: upstreamHeaders(apiKey),
+    headers: {
+      ...upstreamHeaders(apiKey),
+      ...NO_CACHE,
+    },
+    cache: "no-store",
   });
 
   if (!upstream.ok) {
@@ -29,16 +38,29 @@ async function fetchTags(host: string, apiKey: string) {
         error: `Ollama ${upstream.status}: ${text.slice(0, 300) || upstream.statusText}`,
       };
     }
-    return NextResponse.json(errorBody, { status: upstream.status });
+    return NextResponse.json(errorBody, {
+      status: upstream.status,
+      headers: NO_CACHE,
+    });
   }
 
   const data = await upstream.json();
-  return NextResponse.json(data);
+  const models = Array.isArray((data as { models?: unknown }).models)
+    ? (data as { models: unknown[] }).models
+    : [];
+
+  return NextResponse.json(data, {
+    headers: {
+      ...NO_CACHE,
+      "X-Redstone-Model-Count": String(models.length),
+      "X-Redstone-Ollama-Host": host,
+    },
+  });
 }
 
 /** Legacy GET via query params — no custom headers needed. */
 export async function GET(req: NextRequest) {
-  const { host, apiKey } = configFromSearch(req);
+  const { host, apiKey } = await configFromSearchAsync(req);
   try {
     return await fetchTags(host, apiKey);
   } catch (err: unknown) {
@@ -65,7 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { host, apiKey } = configFromBody(body);
+  const { host, apiKey } = await configFromBodyAsync(body);
 
   try {
     return await fetchTags(host, apiKey);
