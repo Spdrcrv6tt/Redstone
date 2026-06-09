@@ -108,6 +108,54 @@ function extractPeople(text: string): string[] {
   return out;
 }
 
+const PHYSICAL_NOUN =
+  /\b(reactors?|nuclear\s+plants?|power\s+plants?|facilit(?:y|ies)|turbines?|generators?|engines?|dams?|bridges?|buildings?|structures?|machines?|vehicles?|spacecraft|rockets?|capsules?|landers?|rovers?|stations?|laborator(?:y|ies)|observator(?:y|ies))\b/gi;
+
+function extractPhysicalTopics(text: string): string[] {
+  const out: string[] = [];
+  if (/\bSL-1\b/i.test(text)) out.push("SL-1 nuclear reactor Idaho");
+  if (/\bThree Mile Island\b/i.test(text)) out.push("Three Mile Island nuclear plant");
+  if (/\bChernobyl\b/i.test(text)) out.push("Chernobyl nuclear reactor");
+  if (/\b(?:the\s+)?reactor\b/i.test(text)) {
+    out.push("nuclear reactor");
+  }
+  if (
+    /\b(?:the\s+)?(?:power\s+)?plant\b/i.test(text) &&
+    !out.some((o) => /plant/i.test(o))
+  ) {
+    out.push("power plant");
+  }
+  for (const m of text.matchAll(
+    /\b([A-Z][A-Za-z0-9-]*(?:\s+[A-Za-z0-9-]+){0,2})\s+(reactor|plant|facility)\b/g
+  )) {
+    const label = `${m[1]} ${m[2]}`;
+    if (!out.some((o) => o.toLowerCase() === label.toLowerCase())) {
+      out.push(label);
+    }
+  }
+  for (const m of text.matchAll(PHYSICAL_NOUN)) {
+    const term = m[0].toLowerCase();
+    if (term.length > 4 && !out.some((o) => o.toLowerCase().includes(term))) {
+      out.push(term);
+    }
+  }
+  return out;
+}
+
+function isTopicAboutPhysical(query: string): boolean {
+  if (!/\b(?:tell me about|what is (?:a |an |the )?|describe (?:the )?|explain (?:the )?)\b/i.test(query)) {
+    return false;
+  }
+  if (extractPeople(query).length > 0) return false;
+  return extractPhysicalTopics(query).length > 0 || PHYSICAL_NOUN.test(query);
+}
+
+function isSpaceObject(label: string): boolean {
+  return /\b(agena|gatv|lunar module|saturn v|target vehicle|spacecraft|capsule|lander|rover)\b/i.test(
+    label
+  );
+}
+
 function extractObjects(text: string): string[] {
   const objects: string[] = [];
   if (/\bAgena\b/i.test(text)) objects.push("Agena target vehicle");
@@ -115,6 +163,7 @@ function extractObjects(text: string): string[] {
   if (/\bLunar Module\b/i.test(text)) objects.push("Lunar Module");
   if (/\bSaturn V\b/i.test(text)) objects.push("Saturn V rocket");
   if (/\btarget vehicle\b/i.test(text)) objects.push("target vehicle");
+  objects.push(...extractPhysicalTopics(text));
   return objects;
 }
 
@@ -181,6 +230,9 @@ function inferLastFocus(prior: OllamaChatMessage[]): FocusRef | null {
   const vessels = extractVessels(combined);
   if (vessels[0]) return { kind: "object", label: vessels[0] };
 
+  const physical = extractPhysicalTopics(combined);
+  if (physical[0]) return { kind: "object", label: physical[0] };
+
   const objs = extractObjects(combined);
   if (objs[0]) return { kind: "object", label: objs[0] };
 
@@ -226,7 +278,7 @@ const PERSON_WHO =
   /\bwho (?:was|is)\b|\bwhich (?:person|astronaut|pilot|commander)\b|\bcommander of\b|\bpilot of\b/i;
 
 const OBJECT_VISUAL =
-  /\b(?:what did .+ look like|target vehicle|spacecraft|rocket|capsule|lander|rover|(?:USS|USNS|HMS|RV)\s+\w+|destroyer|frigate|aircraft carrier|submarine|warship)\b/i;
+  /\b(?:what did .+ look like|target vehicle|spacecraft|rockets?|capsules?|landers?|rovers?|(?:USS|USNS|HMS|RV)\s+\w+|destroyers?|frigates?|aircraft carriers?|submarines?|warships?|reactors?|nuclear\s+plants?|power\s+plants?|facilit(?:y|ies))\b/i;
 
 const FOLLOW_UP =
   /\b(?:what else|tell me more|his career|her career|their career|he |she |they |the mission)\b/i;
@@ -302,6 +354,7 @@ function classifyIntent(query: string): Intent {
   if (EXPLICIT_VISUAL.test(q)) return "explicit_visual";
   if (NARROW_FACT.test(q)) return "narrow_fact";
   if (PERSON_WHO.test(q)) return "person_who";
+  if (isTopicAboutPhysical(q)) return "object_visual";
   if (OBJECT_VISUAL.test(q)) return "object_visual";
   if (FOLLOW_UP.test(q)) return "follow_up";
   return "general";
@@ -361,6 +414,10 @@ function objectFromSources(sources: SearchSource[]): string | null {
   if (/\bAgena\b/i.test(hay)) return "Agena target vehicle";
   if (/\bGATV\b/i.test(hay)) return "Gemini Agena target vehicle";
   if (/\bLunar Module\b/i.test(hay)) return "Lunar Module";
+  const physical = extractPhysicalTopics(hay);
+  if (physical[0]) return physical[0];
+  if (/\bSL-1\b/i.test(hay)) return "SL-1 nuclear reactor Idaho";
+  if (/\bnuclear reactor\b/i.test(hay)) return "nuclear reactor";
   return null;
 }
 
@@ -459,6 +516,36 @@ function imagePlanForVessel(
   };
 }
 
+function imagePlanForTopic(
+  label: string,
+  excludeUrls: string[]
+): ImageSearchPlan {
+  const terms = label
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+  const queries = [`"${label}" photograph`, `${label} historical photo`];
+
+  if (/\bSL-1\b/i.test(label)) {
+    queries.unshift(
+      "SL-1 nuclear reactor Idaho Falls photograph",
+      "SL-1 reactor meltdown 1961 Idaho"
+    );
+  } else if (/\bnuclear reactor\b/i.test(label)) {
+    queries.unshift(`${label} facility photograph`);
+  }
+
+  return {
+    queries,
+    matchTerms: [...terms, label.toLowerCase()],
+    personNames: [],
+    avoidPeople: [],
+    preferPortrait: false,
+    variant: "default",
+    excludeUrls,
+  };
+}
+
 function imagePlanForObject(
   label: string,
   mission: string | null,
@@ -534,13 +621,14 @@ function resolveVisualSubject(
   }
 
   if (intent === "object_visual") {
-    const fromQuery = extractVessels(rawUser)[0];
+    const fromQuery =
+      extractVessels(rawUser)[0] ?? extractPhysicalTopics(rawUser)[0];
     if (fromQuery) return { kind: "object", label: fromQuery };
 
+    const sourceHay = sources.map((s) => `${s.title} ${s.snippet}`).join(" ");
     const label =
-      extractVessels(
-        sources.map((s) => `${s.title} ${s.snippet}`).join(" ")
-      )[0] ??
+      extractVessels(sourceHay)[0] ??
+      extractPhysicalTopics(sourceHay)[0] ??
       objectFromSources(sources) ??
       (memory.lastFocus?.kind === "object" ? memory.lastFocus.label : null) ??
       memory.objects[0];
@@ -575,7 +663,11 @@ function buildImageSearchPlan(
     return imagePlanForVessel(subject.label, priorImageUrls);
   }
 
-  return imagePlanForObject(subject.label, mission, avoid, priorImageUrls);
+  if (isSpaceObject(subject.label)) {
+    return imagePlanForObject(subject.label, mission, avoid, priorImageUrls);
+  }
+
+  return imagePlanForTopic(subject.label, priorImageUrls);
 }
 
 /* ─── Main entry ────────────────────────────────────────────────────────── */

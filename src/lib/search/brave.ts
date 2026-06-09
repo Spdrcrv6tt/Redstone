@@ -336,13 +336,26 @@ function pickBestImage(
   candidates: SearchImage[],
   plan: ImageSearchPlan
 ): SearchImage[] {
-  const ranked = dedupeSimilar(candidates)
-    .filter((img) => portraitImageMatches(img, plan))
+  const eligible = dedupeSimilar(candidates).filter((img) =>
+    portraitImageMatches(img, plan)
+  );
+  const ranked = eligible
     .map((img) => ({ img, score: scoreImage(img, plan) }))
     .filter(({ score }) => score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score);
 
-  return ranked.length > 0 ? [ranked[0].img] : [];
+  if (ranked.length > 0) return [ranked[0].img];
+
+  // Topic/object images often have sparse titles — take best non-stock match.
+  if (!plan.preferPortrait && eligible.length > 0) {
+    const fallback = eligible
+      .map((img) => ({ img, score: scoreImage(img, plan) }))
+      .filter(({ img, score }) => score > 0 && !isStock(img.sourceUrl))
+      .sort((a, b) => b.score - a.score);
+    if (fallback.length > 0) return [fallback[0].img];
+  }
+
+  return [];
 }
 
 function parseImageResult(
