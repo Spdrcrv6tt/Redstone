@@ -218,7 +218,7 @@ export function ModelPicker({
         type="button"
         onClick={openPicker}
         className={[
-          "flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium text-secondary",
+          "flex items-center gap-1 px-3 py-2 md:px-2.5 md:py-1.5 rounded-full text-sm md:text-xs font-medium text-secondary min-h-[44px] md:min-h-0",
           "hover:bg-surface-muted hover:text-primary transition-colors border border-transparent hover:border-theme",
           className ?? "",
         ].join(" ")}
@@ -228,7 +228,9 @@ export function ModelPicker({
         ) : error ? (
           <AlertTriangle className="w-3 h-3 text-amber-500" />
         ) : null}
-        <span>{value ? formatModelLabel(value) : "Model"}</span>
+        <span className="truncate max-w-[9rem] md:max-w-none">
+          {value ? formatModelLabel(value) : "Model"}
+        </span>
         <ChevronDown
           className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
         />

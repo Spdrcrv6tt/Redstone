@@ -354,8 +354,118 @@
   --chat-text-xs: 12px;
 }
 
+/* ─── Mobile shell & safe areas ─────────────────────────────────────────── */
+.safe-top {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell {
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+.mobile-top-bar {
+  border-bottom: 1px solid var(--sidebar-border);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.landing-shell {
+  justify-content: flex-end;
+  padding-bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .landing-shell {
+    justify-content: center;
+    align-items: center;
+  }
+}
+
+.landing-greeting {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .landing-greeting {
+    margin-bottom: 0;
+  }
+}
+
+.composer-on-landing {
+  width: 100%;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .composer-on-landing {
+    margin-top: 2rem;
+    padding-bottom: 10vh;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+.composer-in-chat {
+  padding: 0.5rem 0.75rem max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .composer-in-chat {
+    padding: 0.5rem 1rem 1rem;
+  }
+}
+
+.composer-icon-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+@media (min-width: 768px) {
+  .composer-icon-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+}
+
+.composer-model-mobile {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.composer-surface {
+  -webkit-tap-highlight-color: transparent;
+}
+
 .chat-composer-wrap {
   max-width: var(--chat-composer-max);
+}
+
+@media (max-width: 767px) {
+  :root,
+  [data-theme="light"],
+  [data-theme="dark"] {
+    --chat-composer-max: 100%;
+    --chat-thread-max: 100%;
+    --chat-text: 16px;
+  }
+
+  .composer-surface {
+    border-radius: 22px;
+  }
 }
 
 .chat-thread-wrap {

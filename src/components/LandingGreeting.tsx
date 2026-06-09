@@ -15,7 +15,7 @@ export function LandingGreeting() {
 
   return (
     <motion.div
-      className="text-center px-6"
+      className="landing-greeting text-center px-4 md:px-6"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12, transition: { duration: 0.2 } }}
@@ -24,7 +24,7 @@ export function LandingGreeting() {
       <AnimatePresence mode="wait">
         <motion.h1
           key={`${greeting.before}${greeting.highlight ?? ""}${greeting.after}`}
-          className="text-[2rem] sm:text-[2.75rem] leading-[1.15] font-normal text-primary tracking-tight"
+          className="text-[1.625rem] sm:text-[2rem] md:text-[2.75rem] leading-[1.2] font-normal text-primary tracking-tight"
           initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}

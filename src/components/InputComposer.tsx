@@ -209,62 +209,92 @@ export function InputComposer({
             <p className="px-5 pt-3 text-xs text-red-500">{fileError}</p>
           )}
 
-          <div className="flex items-end gap-1.5 px-3 py-2.5">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming || attachments.length >= MAX_FILES}
-              title="Attach files"
-              className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-muted transition-all duration-200 active:scale-95 disabled:opacity-40"
-            >
-              <Plus className="w-5 h-5" strokeWidth={1.75} />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              accept="image/*,.txt,.md,.json,.csv,.xml,.html,.js,.ts,.tsx,.jsx,.py,.go,.rs,.java,.css,.yaml,.yml,.sql,.sh"
-              onChange={(e) => {
-                if (e.target.files?.length) addFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); resize(); }}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholderText}
-              disabled={blocked || isStreaming}
-              rows={1}
-              className="flex-1 bg-transparent text-[length:var(--chat-text)] text-primary placeholder:text-muted resize-none outline-none leading-relaxed min-h-[44px] max-h-[180px] py-3"
-            />
-
-            <ModelPicker
-              value={currentModel}
-              onChange={handleModelChange}
-              variant="compact"
-            />
-
-            {isStreaming ? (
+          <div className="composer-input-area px-2 py-2 md:px-3 md:py-2.5">
+            <div className="flex items-end gap-1 md:gap-1.5">
               <button
-                onClick={onStop}
-                title="Stop"
-                className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center btn-send active:scale-95"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isStreaming || attachments.length >= MAX_FILES}
+                title="Attach files"
+                className="composer-icon-btn flex-shrink-0 rounded-full flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-muted transition-all duration-200 active:scale-95 disabled:opacity-40"
               >
-                <Square className="w-3.5 h-3.5 fill-current" />
+                <Plus className="w-5 h-5" strokeWidth={1.75} />
               </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!canSend}
-                title="Send"
-                className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center btn-send active:scale-95"
-              >
-                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
-              </button>
-            )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept="image/*,.txt,.md,.json,.csv,.xml,.html,.js,.ts,.tsx,.jsx,.py,.go,.rs,.java,.css,.yaml,.yml,.sql,.sh"
+                onChange={(e) => {
+                  if (e.target.files?.length) addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => { setInput(e.target.value); resize(); }}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholderText}
+                disabled={blocked || isStreaming}
+                rows={1}
+                className="flex-1 bg-transparent text-[length:var(--chat-text)] text-primary placeholder:text-muted resize-none outline-none leading-relaxed min-h-[44px] max-h-[180px] py-2.5 md:py-3"
+              />
+
+              <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+                <ModelPicker
+                  value={currentModel}
+                  onChange={handleModelChange}
+                  variant="compact"
+                />
+                {isStreaming ? (
+                  <button
+                    onClick={onStop}
+                    title="Stop"
+                    className="composer-icon-btn rounded-full flex items-center justify-center btn-send active:scale-95"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSend}
+                    disabled={!canSend}
+                    title="Send"
+                    className="composer-icon-btn rounded-full flex items-center justify-center btn-send active:scale-95"
+                  >
+                    <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex md:hidden items-center justify-between gap-2 mt-2 px-1">
+              <ModelPicker
+                value={currentModel}
+                onChange={handleModelChange}
+                variant="compact"
+                className="composer-model-mobile"
+              />
+              {isStreaming ? (
+                <button
+                  onClick={onStop}
+                  title="Stop"
+                  className="composer-icon-btn rounded-full flex items-center justify-center btn-send active:scale-95"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  title="Send"
+                  className="composer-icon-btn rounded-full flex items-center justify-center btn-send active:scale-95"
+                >
+                  <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
           </div>
 
           <AnimatePresence>

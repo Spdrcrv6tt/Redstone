@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useAppStore } from "@/lib/store";
 import { useChat } from "@/hooks/useChat";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { ChatSidebar } from "@/components/ChatSidebar";
+import { MobileTopBar } from "@/components/MobileTopBar";
 import { LandingGreeting } from "@/components/LandingGreeting";
 import { MessageBubble } from "@/components/MessageBubble";
 import { InputComposer } from "@/components/InputComposer";
@@ -14,6 +16,9 @@ import { AppBootstrap } from "@/components/AppBootstrap";
 import type { MessageAttachment } from "@/types";
 
 export default function Home() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isMobile = useIsMobile();
+
   const {
     activeConversationId,
     conversations,
@@ -52,6 +57,17 @@ export default function Home() {
     }
   }, [activeConversationId]);
 
+  useEffect(() => {
+    if (!isMobile) setMobileNavOpen(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
+
   const handleSend = useCallback(
     (content: string, attachments: MessageAttachment[] = []) => {
       if (!settings.defaultModel) return;
@@ -71,6 +87,7 @@ export default function Home() {
   const handleNewChat = useCallback(() => {
     setActiveConversation(null);
     setSidebarExpanded(false);
+    setMobileNavOpen(false);
   }, [setActiveConversation, setSidebarExpanded]);
 
   const composerKey = activeConversationId ?? "landing";
@@ -81,14 +98,23 @@ export default function Home() {
       <AmbientBackground />
 
       <LayoutGroup>
-        <div className="flex h-screen overflow-hidden">
-          <ChatSidebar onNewChat={handleNewChat} />
+        <div className="app-shell flex h-dvh overflow-hidden">
+          <ChatSidebar
+            onNewChat={handleNewChat}
+            mobileOpen={mobileNavOpen}
+            onMobileClose={() => setMobileNavOpen(false)}
+          />
 
           <main className="flex flex-col flex-1 min-w-0 relative">
+            <MobileTopBar
+              onOpenMenu={() => setMobileNavOpen(true)}
+              onNewChat={handleNewChat}
+            />
+
             <div
               className={[
                 "flex-1 flex flex-col min-h-0",
-                !isChat ? "justify-center items-center" : "",
+                !isChat ? "landing-shell" : "",
               ].join(" ")}
             >
               <AnimatePresence mode="wait">
@@ -97,13 +123,13 @@ export default function Home() {
                 ) : (
                   <motion.div
                     key="thread"
-                    className="chat-scroll flex-1 overflow-y-auto min-h-0"
+                    className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <div className="chat-thread-wrap mx-auto w-full px-4 sm:px-6 pt-10 pb-4">
+                    <div className="chat-thread-wrap mx-auto w-full px-3 sm:px-6 pt-4 md:pt-10 pb-4">
                       {messages.map((msg) => (
                         <MessageBubble
                           key={msg.id}
@@ -122,8 +148,8 @@ export default function Home() {
               <motion.div
                 layout
                 className={[
-                  "chat-composer-wrap w-full px-4 flex-shrink-0 mx-auto",
-                  isChat ? "pb-4 pt-2" : "mt-8 pb-[10vh]",
+                  "chat-composer-wrap w-full flex-shrink-0 mx-auto",
+                  isChat ? "composer-in-chat" : "composer-on-landing",
                 ].join(" ")}
                 transition={{ type: "spring", stiffness: 400, damping: 38 }}
               >
@@ -132,7 +158,8 @@ export default function Home() {
                   onSend={handleSend}
                   onStop={stop}
                   isStreaming={isStreaming}
-                  autoFocus
+                  autoFocus={!isMobile}
+                  placeholder={isMobile ? "Ask" : "Ask anything"}
                 />
               </motion.div>
             </div>

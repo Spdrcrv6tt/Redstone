@@ -88,7 +88,7 @@ export function MessageBubble({
       <div
         className={
           isUser
-            ? "max-w-[min(85%,520px)]"
+            ? "max-w-[min(92%,520px)] md:max-w-[min(85%,520px)]"
             : "w-full"
         }
       >
