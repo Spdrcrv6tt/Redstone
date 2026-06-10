@@ -1,3 +1,4 @@
+import { stripDiagramBlocks } from "@/lib/diagram";
 import { stripImageLayoutTag } from "@/lib/search/layout";
 
 /** Remove bracketed source markers like [1], [2, 3] from model output. */
@@ -102,6 +103,8 @@ export function cleanSearchResponse(text: string): string {
 
 /** Plain prose for clipboard — no cite tags or legacy markers. */
 export function plainSearchResponse(text: string): string {
-  let t = stripImageLayoutTag(stripCiteTags(cleanSearchResponse(text)));
+  let t = stripDiagramBlocks(
+    stripImageLayoutTag(stripCiteTags(cleanSearchResponse(text)))
+  );
   return t.replace(/<img-here\s*\/?>/gi, "").trim();
 }

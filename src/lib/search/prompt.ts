@@ -36,6 +36,9 @@ const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your 
 
 Conversation: you see the full thread. Resolve pronouns and partial names from earlier turns. Stay on the established subject.`;
 
+const DIAGRAM_INSTRUCTIONS = `Interactive diagrams: If the user asks to LEARN or VISUALIZE a concept (e.g., "show me a diagram of an engine"), generate a single-file HTML/JS/CSS interactive visualization and wrap it EXACTLY in <redstone-diagram>...</redstone-diagram> tags. Do NOT use markdown code blocks for diagrams.
+CRITICAL EXCEPTION: If the user explicitly asks you to WRITE CODE or DRAFT AN HTML PAGE (e.g., "write an HTML landing page"), do NOT use the <redstone-diagram> tag. Output standard markdown \`\`\`html code blocks instead.`;
+
 function answerInstructions(style: TurnPlan["answerStyle"]): string {
   if (style === "narrow") {
     return "This is a narrow question — answer in one or two direct sentences.";
@@ -125,6 +128,7 @@ export function buildAugmentedSystemPrompt(
 ): string {
   const instructionParts = [
     webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH,
+    DIAGRAM_INSTRUCTIONS,
     answerInstructions(plan.answerStyle),
     visualInstructions(
       visualMode,
