@@ -119,7 +119,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
       searchReason = "aggressive mode requires orchestrator model in Settings";
       runWebSearch = draftPlan.needsWebSearch;
     } else {
-      const orch = await runOrchestrator(
+      const orchResult = await runOrchestrator(
         host,
         apiKey,
         routerModel,
@@ -129,10 +129,11 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 
       routerUsed = true;
 
+      const orch = orchResult.plan;
       if (orch) {
         runWebSearch = orch.webSearch;
         overrideWebQuery = orch.webQuery || draftPlan.webSearchQuery;
-        searchReason = `orchestrator: ${orch.reason}`;
+        searchReason = `watchdog: ${orch.reason}`;
         searchConfidence = "high";
         orchestratorMeta = {
           webSearch: orch.webSearch,
@@ -150,8 +151,12 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
         }
       } else {
         runWebSearch = draftPlan.needsWebSearch;
-        searchReason = "orchestrator failed — using heuristics";
+        const failReason = orchResult.error ?? "unknown";
+        searchReason = `watchdog failed (${failReason}) — using heuristics`;
         searchConfidence = "low";
+        if (orchResult.raw) {
+          console.warn("[watchdog] raw output:", orchResult.raw);
+        }
       }
     }
   } else if (searchMode === "always") {

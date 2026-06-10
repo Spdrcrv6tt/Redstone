@@ -32,11 +32,18 @@ Rules:
 - Use neither for hello, thanks, code, rewrite, or general chat.
 - Prefer web_search for factual/historical questions about named entities.`;
 
+/** Strip <think>…</think> blocks that Qwen3 and similar models prepend. */
+function stripThinking(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
 function extractJsonObject(text: string): string | null {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
+  // Strip thinking blocks first, then find outermost { }
+  const cleaned = stripThinking(text);
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
   if (start === -1 || end <= start) return null;
-  return text.slice(start, end + 1);
+  return cleaned.slice(start, end + 1);
 }
 
 function parseOrchestratorResponse(raw: string): OrchestratorPlan | null {
@@ -57,33 +64,49 @@ function parseOrchestratorResponse(raw: string): OrchestratorPlan | null {
       webQuery: (data.web_query ?? "").trim(),
       imageSearch: !!data.image_search,
       imageQuery: (data.image_query ?? "").trim(),
-      reason: (data.reason ?? "orchestrator").trim(),
+      reason: (data.reason ?? "watchdog").trim(),
     };
   } catch {
     return null;
   }
 }
 
-/** Full orchestrator call for aggressive mode. */
+export interface OrchestratorResult {
+  plan: OrchestratorPlan | null;
+  /** Human-readable failure reason when plan is null. */
+  error?: string;
+  /** Raw model output for debugging. */
+  raw?: string;
+}
+
+/** Full watchdog call for aggressive mode. */
 export async function runOrchestrator(
   host: string,
   apiKey: string,
   model: string,
   userQuery: string,
   threadSnippet: string
-): Promise<OrchestratorPlan | null> {
+): Promise<OrchestratorResult> {
+  if (!model.trim()) {
+    return { plan: null, error: "no watchdog model configured" };
+  }
+
   const context =
     threadSnippet.length > 0
       ? `\n\nRecent assistant reply (excerpt):\n${threadSnippet.slice(0, 500)}`
       : "";
 
+  let res: Response;
   try {
-    const res = await fetch(`${host}/api/chat`, {
+    res = await fetch(`${host}/api/chat`, {
       method: "POST",
       headers: upstreamHeaders(apiKey),
       body: JSON.stringify({
         model,
         stream: false,
+        // Disable thinking mode (Qwen3, Gemma4 etc.) so the token budget
+        // isn't exhausted on <think> blocks before the JSON is written.
+        think: false,
         messages: [
           {
             role: "user",
@@ -92,22 +115,50 @@ export async function runOrchestrator(
         ],
         options: {
           temperature: 0,
-          num_predict: 180,
+          // Generous budget: thinking-disabled models still need room for JSON
+          num_predict: 300,
           num_ctx: 4096,
         },
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(20_000),
     });
-
-    if (!res.ok) return null;
-
-    const data = (await res.json()) as {
-      message?: { content?: string };
-    };
-    return parseOrchestratorResponse(data.message?.content ?? "");
-  } catch {
-    return null;
+  } catch (e) {
+    return { plan: null, error: `network error: ${String(e)}` };
   }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    const msg = (() => {
+      try {
+        return (JSON.parse(body) as { error?: string }).error ?? body;
+      } catch {
+        return body || `HTTP ${res.status}`;
+      }
+    })();
+    return { plan: null, error: `Ollama ${res.status}: ${msg.slice(0, 200)}` };
+  }
+
+  const data = (await res.json()) as {
+    message?: { content?: string };
+    error?: string;
+  };
+
+  if (data.error) {
+    return { plan: null, error: data.error };
+  }
+
+  const raw = data.message?.content ?? "";
+  const plan = parseOrchestratorResponse(raw);
+
+  if (!plan) {
+    return {
+      plan: null,
+      error: `could not parse JSON from model output`,
+      raw: raw.slice(0, 500),
+    };
+  }
+
+  return { plan, raw };
 }
 
 /** Build image search plan from orchestrator subject string. */
