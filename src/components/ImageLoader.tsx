@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
+import {
+  ImageGenResult,
+  ImageGenerationPanel,
+  statusToStage,
+} from "@/components/ImageGenerationPanel";
 import type { ImageGenerationSpec } from "@/types/image-gen";
 
 interface ImageLoaderProps {
@@ -73,8 +78,8 @@ export function ImageLoader({
 
         if (cancelled) return;
 
-        setImageUrl(data.url!);
-        onBuiltRef.current?.(data.url!);
+        setImageUrl(data.url);
+        onBuiltRef.current?.(data.url);
       } catch (err) {
         if (!cancelled) {
           const message =
@@ -95,44 +100,30 @@ export function ImageLoader({
       cancelled = true;
       if (stageTimer) clearTimeout(stageTimer);
     };
-  }, [
-    spec.url,
-    spec.positive_prompt,
-    spec.negative_prompt,
-    model,
-  ]);
+  }, [spec.url, spec.positive_prompt, spec.negative_prompt, model]);
 
   if (imageUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <ImageGenResult
         src={imageUrl}
         alt={spec.positive_prompt.slice(0, 120)}
-        className="my-4 w-full rounded-xl object-cover shadow-lg"
       />
     );
   }
 
   if (error) {
     return (
-      <div className="my-4 flex h-64 w-full flex-col items-center justify-center rounded-xl border border-red-500/30 bg-[#1a1d26] p-4 text-center text-sm text-red-400">
-        {error}
-      </div>
+      <ImageGenerationPanel
+        stage="error"
+        error={error}
+        showPipeline={false}
+      />
     );
   }
 
-  return (
-    <div className="my-4 flex h-64 w-full flex-col items-center justify-center rounded-xl border border-[#3a3f4b] bg-[#1a1d26] animate-pulse">
-      <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-600 border-t-[#4cc9f0]" />
-      <p className="font-medium tracking-wide text-gray-300">{status}</p>
-    </div>
-  );
+  return <ImageGenerationPanel stage={statusToStage(status)} />;
 }
 
 export function ImageArchitectPending() {
-  return (
-    <div className="my-4 flex h-64 w-full items-center justify-center rounded-xl border border-dashed border-theme bg-surface-muted/60">
-      <p className="text-sm text-muted">Engineering image prompt…</p>
-    </div>
-  );
+  return <ImageGenerationPanel stage="architect" showPipeline={false} />;
 }
