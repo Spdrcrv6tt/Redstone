@@ -639,35 +639,43 @@
   }
 }
 
+@property --composer-edge-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
 .composer-surface--thinking-canvas {
   border-color: transparent;
   box-shadow: none;
-  overflow: visible;
+  --composer-edge-angle: 0deg;
 }
 
+/* Thin ring only — gradient angle sweeps, element does not spin */
 .composer-surface--thinking-canvas::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -1px;
   border-radius: 30px;
+  padding: 1.5px;
   background: conic-gradient(
-    from 0deg,
-    #b87a8a,
-    #7a9e86,
-    #7a8fb8,
-    #a88a7a,
-    #b87a8a
+    from var(--composer-edge-angle),
+    #b07888,
+    #789a84,
+    #7888aa,
+    #a08878,
+    #b07888
   );
-  animation: composer-canvas-border-spin 2.8s linear infinite;
-  z-index: 0;
-}
-
-.composer-surface--thinking-canvas::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 28px;
-  background: var(--surface);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: composer-edge-sweep 3s linear infinite;
+  pointer-events: none;
   z-index: 0;
 }
 
@@ -676,9 +684,9 @@
   z-index: 1;
 }
 
-@keyframes composer-canvas-border-spin {
+@keyframes composer-edge-sweep {
   to {
-    transform: rotate(360deg);
+    --composer-edge-angle: 360deg;
   }
 }
 
@@ -1233,6 +1241,7 @@ button.source-cite {
 @media (prefers-reduced-motion: reduce) {
   .composer-surface--thinking-canvas::before {
     animation: none !important;
+    --composer-edge-angle: 0deg;
   }
 }
 
