@@ -29,6 +29,7 @@ interface InputComposerProps {
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
+  onDraftChange?: (draft: string, hasAttachments: boolean) => void;
 }
 
 export function InputComposer({
@@ -38,6 +39,7 @@ export function InputComposer({
   disabled,
   placeholder = "Ask anything",
   autoFocus,
+  onDraftChange,
 }: InputComposerProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
@@ -70,6 +72,10 @@ export function InputComposer({
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
   }, [autoFocus]);
+
+  useEffect(() => {
+    onDraftChange?.(input, attachments.length > 0);
+  }, [input, attachments.length, onDraftChange]);
 
   const addFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -145,10 +151,8 @@ export function InputComposer({
 
   return (
     <div className="w-full">
-      <motion.div
-        layout
+      <div
         className="w-full"
-        transition={{ type: "spring", stiffness: 420, damping: 36 }}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
@@ -313,7 +317,7 @@ export function InputComposer({
             )}
           </AnimatePresence>
         </div>
-      </motion.div>
+      </div>
 
       <p className="text-center text-[11px] text-muted/80 mt-3 px-4 tracking-wide">
         Redstone can make mistakes — verify important information.

@@ -26,6 +26,9 @@
   --aurora-a: rgba(167, 139, 250, 0.18);
   --aurora-b: rgba(125, 211, 252, 0.14);
   --aurora-c: rgba(251, 207, 232, 0.1);
+  --gemini-sky-a: rgba(147, 197, 253, 0.45);
+  --gemini-sky-b: rgba(199, 210, 254, 0.35);
+  --gemini-sky-c: rgba(186, 230, 253, 0.3);
   --ray-color: rgba(255, 255, 255, 0.45);
   --vignette: radial-gradient(ellipse 90% 80% at 50% 50%, transparent 50%, rgba(240, 244, 249, 0.5) 100%);
   --composer-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.04);
@@ -85,6 +88,9 @@
   --aurora-a: rgba(99, 102, 241, 0.12);
   --aurora-b: rgba(14, 165, 233, 0.08);
   --aurora-c: rgba(192, 132, 252, 0.08);
+  --gemini-sky-a: rgba(37, 99, 235, 0.42);
+  --gemini-sky-b: rgba(79, 70, 229, 0.28);
+  --gemini-sky-c: rgba(20, 184, 166, 0.18);
   --ray-color: rgba(255, 255, 255, 0.06);
   --vignette: radial-gradient(ellipse 90% 80% at 50% 50%, transparent 40%, rgba(9, 9, 12, 0.6) 100%);
   --composer-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
@@ -206,6 +212,17 @@
 
 /* ─── Ambient layers ─────────────────────────────────────────────────────── */
 .ambient-base { background: var(--bg-base); transition: background 0.5s ease; }
+
+/* Gemini-style top curtain — visible on new chat only */
+.ambient-gemini-sky {
+  height: min(46vh, 420px);
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 130% 90% at 50% -30%, var(--gemini-sky-a) 0%, transparent 72%),
+    radial-gradient(ellipse 90% 70% at 12% 0%, var(--gemini-sky-b) 0%, transparent 68%),
+    radial-gradient(ellipse 80% 65% at 88% 4%, var(--gemini-sky-c) 0%, transparent 65%),
+    linear-gradient(180deg, transparent 0%, var(--bg-base) 100%);
+}
 
 .ambient-aurora {
   background:
@@ -375,43 +392,19 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-.landing-shell {
-  justify-content: flex-end;
-  padding-bottom: 0;
-}
-
-@media (min-width: 768px) {
-  .landing-shell {
-    justify-content: center;
-    align-items: center;
-  }
+.landing-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1rem 0.5rem;
 }
 
 .landing-greeting {
   flex-shrink: 0;
-  margin-bottom: 1rem;
-}
-
-@media (min-width: 768px) {
-  .landing-greeting {
-    margin-bottom: 0;
-  }
-}
-
-.composer-on-landing {
   width: 100%;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
-  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
-}
-
-@media (min-width: 768px) {
-  .composer-on-landing {
-    margin-top: 2rem;
-    padding-bottom: 10vh;
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
+  max-width: 42rem;
 }
 
 .composer-in-chat {

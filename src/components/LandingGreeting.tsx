@@ -16,10 +16,10 @@ export function LandingGreeting() {
   return (
     <motion.div
       className="landing-greeting text-center px-4 md:px-6"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12, transition: { duration: 0.2 } }}
-      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      exit={{ opacity: 0, y: 8, filter: "blur(4px)", transition: { duration: 0.18 } }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
     >
       <AnimatePresence mode="wait">
         <motion.h1

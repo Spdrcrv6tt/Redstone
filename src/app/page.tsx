@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAppStore } from "@/lib/store";
 import { useChat } from "@/hooks/useChat";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -17,6 +17,8 @@ import type { MessageAttachment } from "@/types";
 
 export default function Home() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [composerDraft, setComposerDraft] = useState("");
+  const [composerHasAttachments, setComposerHasAttachments] = useState(false);
   const isMobile = useIsMobile();
 
   const {
@@ -32,6 +34,9 @@ export default function Home() {
   const messages = conversation?.messages ?? [];
   const isStreaming = messages.some((m) => m.isStreaming);
   const isChat = messages.length > 0;
+  const showAurora = !isChat;
+  const showSplash =
+    !isChat && !composerDraft.trim() && !composerHasAttachments;
 
   const lastAssistantId = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -88,46 +93,49 @@ export default function Home() {
     setActiveConversation(null);
     setSidebarExpanded(false);
     setMobileNavOpen(false);
+    setComposerDraft("");
+    setComposerHasAttachments(false);
   }, [setActiveConversation, setSidebarExpanded]);
+
+  const handleDraftChange = useCallback(
+    (draft: string, hasAttachments: boolean) => {
+      setComposerDraft(draft);
+      setComposerHasAttachments(hasAttachments);
+    },
+    []
+  );
 
   const composerKey = activeConversationId ?? "landing";
 
   return (
     <>
       <AppBootstrap />
-      <AmbientBackground />
+      <AmbientBackground active={showAurora} />
 
-      <LayoutGroup>
-        <div className="app-shell flex h-dvh overflow-hidden">
-          <ChatSidebar
+      <div className="app-shell flex h-dvh overflow-hidden">
+        <ChatSidebar
+          onNewChat={handleNewChat}
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+
+        <main className="flex flex-col flex-1 min-w-0 relative">
+          <MobileTopBar
+            onOpenMenu={() => setMobileNavOpen(true)}
             onNewChat={handleNewChat}
-            mobileOpen={mobileNavOpen}
-            onMobileClose={() => setMobileNavOpen(false)}
           />
 
-          <main className="flex flex-col flex-1 min-w-0 relative">
-            <MobileTopBar
-              onOpenMenu={() => setMobileNavOpen(true)}
-              onNewChat={handleNewChat}
-            />
-
-            <div
-              className={[
-                "flex-1 flex flex-col min-h-0",
-                !isChat ? "landing-shell" : "",
-              ].join(" ")}
-            >
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 relative">
               <AnimatePresence mode="wait">
-                {!isChat ? (
-                  <LandingGreeting key="greeting" />
-                ) : (
+                {isChat ? (
                   <motion.div
                     key="thread"
                     className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25 }}
+                    transition={{ duration: 0.22 }}
                   >
                     <div className="chat-thread-wrap mx-auto w-full px-3 sm:px-6 pt-4 md:pt-10 pb-4">
                       {messages.map((msg) => (
@@ -143,30 +151,39 @@ export default function Home() {
                       ))}
                     </div>
                   </motion.div>
+                ) : (
+                  <motion.div
+                    key="landing"
+                    className="landing-stage"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    <AnimatePresence mode="wait">
+                      {showSplash ? (
+                        <LandingGreeting key="splash" />
+                      ) : null}
+                    </AnimatePresence>
+                  </motion.div>
                 )}
               </AnimatePresence>
-
-              <motion.div
-                layout
-                className={[
-                  "chat-composer-wrap w-full flex-shrink-0 mx-auto",
-                  isChat ? "composer-in-chat" : "composer-on-landing",
-                ].join(" ")}
-                transition={{ type: "spring", stiffness: 400, damping: 38 }}
-              >
-                <InputComposer
-                  key={composerKey}
-                  onSend={handleSend}
-                  onStop={stop}
-                  isStreaming={isStreaming}
-                  autoFocus={!isMobile}
-                  placeholder={isMobile ? "Ask" : "Ask anything"}
-                />
-              </motion.div>
             </div>
-          </main>
-        </div>
-      </LayoutGroup>
+
+            <div className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat">
+              <InputComposer
+                key={composerKey}
+                onSend={handleSend}
+                onStop={stop}
+                isStreaming={isStreaming}
+                autoFocus={!isMobile}
+                placeholder={isMobile ? "Ask" : "Ask anything"}
+                onDraftChange={handleDraftChange}
+              />
+            </div>
+          </div>
+        </main>
+      </div>
 
       <SettingsModal />
     </>
