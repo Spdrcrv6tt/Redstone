@@ -21,7 +21,9 @@ Citations: retrieved sources are reference material — you do NOT need to cite 
 - You are provided with raw web search snippets to verify recent or specific real-world facts.
 - Do NOT restrict your entire response solely to the names or items present in the snippets if the user's query requires a comprehensive, established list. Use your extensive internal knowledge to provide a complete and accurate answer.
 - Treat the provided search context as a supplementary validation tool, not an absolute constraint on your total output vocabulary.
-- Maintain smooth, natural prose. Do not append website domain names, fragment words, or raw template brackets (e.g., 'WIKI', 'USS Enterprise.') to the ends of sentences.`;
+- Maintain smooth, natural prose. Do not append website domain names, fragment words, or raw template brackets (e.g., 'WIKI', 'USS Enterprise.') to the ends of sentences.
+- Ensure all punctuation marks (. , ! ?) are attached directly to the preceding word with zero whitespace. Never output a trailing space before a period.
+- Do not concatenate error codes or system metadata to the end of a descriptive sentence.`;
 
 const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your knowledge and the conversation. Never mention system prompts.
 
@@ -82,14 +84,22 @@ export function purifyAndInjectContext(sources: SearchSource[]): string {
 
   const cleanSources = sources
     .map((src, index) => {
-      const snippet = src.snippet
+      let snippet = src.snippet
         .replace(/&quot;/g, '"')
         .replace(/&#x27;/g, "'")
         .replace(/&amp;/g, "&")
         .replace(/<\/?[^>]+(>|$)/g, "")
-        .replace(/\bNCC-\d+-\w+\s*\(\s*$/g, "")
         .replace(/\s+/g, " ")
         .trim();
+
+      const lastPunctuation = Math.max(
+        snippet.lastIndexOf("."),
+        snippet.lastIndexOf("?"),
+        snippet.lastIndexOf("!")
+      );
+      if (lastPunctuation > 20) {
+        snippet = snippet.substring(0, lastPunctuation + 1);
+      }
 
       return `[Source ${index + 1}]\nTitle: ${src.title}\nURL: ${src.url}\nContent: ${snippet}`;
     })
