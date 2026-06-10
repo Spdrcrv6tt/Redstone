@@ -147,7 +147,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
           let batch = await executeWebSearches(queries, braveKey, 10);
           batch = await enrichSourcesForList(batch);
           batch = filterBlacklistedSources(batch);
-          batch = await enrichSourcesWithDeepContent(batch);
+          batch = await enrichSourcesWithDeepContent(batch, rawUserQuery);
           return { sources: batch };
         }
         const webOnly = await executeSearch(finalSearchQuery, null, braveKey);
@@ -156,7 +156,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
           return { sources: batch, searchError: webOnly.searchError };
         }
         batch = filterBlacklistedSources(batch);
-        batch = await enrichSourcesWithDeepContent(batch);
+        batch = await enrichSourcesWithDeepContent(batch, rawUserQuery);
         return { sources: batch };
       } catch (err) {
         return {

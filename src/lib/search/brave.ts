@@ -7,6 +7,7 @@ import {
   type ImageSearchPlan,
   personNamesInText,
 } from "@/lib/search/coordinator";
+import { needsUnconditionalDeepEnrich } from "@/lib/search/query-enhance";
 import type { SearchImage, SearchSource } from "@/types";
 
 const BRAVE_WEB = "https://api.search.brave.com/res/v1/web/search";
@@ -118,12 +119,15 @@ async function fetchWikipediaExtract(url: string): Promise<string | null> {
 /** Replace thin Brave preview snippets with full Wikipedia article text. */
 export async function enrichSourcesWithDeepContent(
   sources: SearchSource[],
+  userQuery = "",
   maxDepth = 4
 ): Promise<SearchSource[]> {
+  const forceDeep = needsUnconditionalDeepEnrich(userQuery);
+
   const enriched = await Promise.all(
     sources.slice(0, maxDepth).map(async (source) => {
-      if (source.snippet.length >= 300) return source;
       if (!/wikipedia\.org/i.test(source.url)) return source;
+      if (!forceDeep && source.snippet.length >= 300) return source;
 
       const extract = await fetchWikipediaExtract(source.url);
       if (!extract) return source;
