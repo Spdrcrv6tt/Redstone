@@ -375,6 +375,14 @@ function classifyIntent(query: string): Intent {
 const EXPLICIT_SEARCH =
   /\b(?:search(?:\s+the\s+web)?|look\s+up|google|find\s+out|latest|current|breaking|news|today|this\s+week|recent(?:ly)?|as\s+of\s+\d{4}|up\s+to\s+date)\b/i;
 
+/** Exact numeric/timestamp formatting — parametric memory is unreliable without RAG. */
+const DEMANDS_EXACT_DATA =
+  /(?:minute-by-minute|second-by-second|exact timeline|specific (?:dates|times|altitudes|numbers))/i;
+
+export function demandsExactData(query: string): boolean {
+  return DEMANDS_EXACT_DATA.test(query.trim());
+}
+
 const SKIP_SEARCH =
   /^(?:hi|hello|hey|thanks|thank\s+you|ok(?:ay)?|yes|no|sure|got\s+it|cool|nice)\b[!.,?\s]*$/i;
 
@@ -404,6 +412,14 @@ export function decideWebSearch(
 
   if (exhaustiveList) {
     return { search: true, reason: "exhaustive list", confidence: "high" };
+  }
+
+  if (demandsExactData(q)) {
+    return {
+      search: true,
+      reason: "high-density data request",
+      confidence: "high",
+    };
   }
 
   if (EXPLICIT_SEARCH.test(q)) {
@@ -815,6 +831,8 @@ export function planTurn(
   } else if (NARROW_FACT.test(raw) || (PERSON_WHO.test(raw) && raw.split(/\s+/).length < 14)) {
     answerStyle = "narrow";
   } else if (intent === "follow_up" && /\b(career|story|history|full)\b/i.test(raw)) {
+    answerStyle = "narrative";
+  } else if (demandsExactData(raw)) {
     answerStyle = "narrative";
   }
 

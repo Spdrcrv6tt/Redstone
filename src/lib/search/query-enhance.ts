@@ -10,7 +10,9 @@ export function needsUnconditionalDeepEnrich(query: string): boolean {
     /\btimeline\b/i.test(query) ||
     /\bsequence of events\b/i.test(query) ||
     /\bwalk me through\b/i.test(query) ||
-    /\bfrom the .+ to\b/i.test(query)
+    /\bfrom the .+ to\b/i.test(query) ||
+    /\bminute-by-minute\b/i.test(query) ||
+    /\bsecond-by-second\b/i.test(query)
   );
 }
 
