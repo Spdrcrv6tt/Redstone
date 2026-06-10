@@ -8,6 +8,7 @@ import {
   useMotionValue,
   useReducedMotion,
 } from "framer-motion";
+import { usePageVisible } from "@/hooks/usePageVisible";
 
 interface AgentStatusLineProps {
   message: string;
@@ -48,8 +49,11 @@ function StatusDot({
   const y = useMotionValue(0);
   const scale = useMotionValue(1);
   const opacity = useMotionValue(reduceMotion ? 1 : 0);
+  const pageVisible = usePageVisible();
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  const pageVisibleRef = useRef(pageVisible);
+  pageVisibleRef.current = pageVisible;
   const enteredRef = useRef(false);
 
   useEffect(() => {
@@ -89,7 +93,13 @@ function StatusDot({
   }, [index, opacity, reduceMotion, scale, x, y]);
 
   useAnimationFrame((time) => {
-    if (phaseRef.current !== "work" || reduceMotion) return;
+    if (
+      phaseRef.current !== "work" ||
+      reduceMotion ||
+      !pageVisibleRef.current
+    ) {
+      return;
+    }
     const p = organicPosition(time / 1000, index);
     x.set(p.x);
     y.set(p.y);
