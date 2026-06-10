@@ -4,11 +4,13 @@ const FAILURE_RE =
   /\b(failure|abort|accident|explosion|disaster|malfunction|tether|emergency)\b/i;
 const ROMAN_MISSION_RE = /\b(gemini|apollo|mercury)\s+[IVXLC]+\b/i;
 
-/** Timeline queries need full Wikipedia extracts even when Brave snippets are long. */
+/** Timeline / crisis walkthrough queries need full Wikipedia extracts. */
 export function needsUnconditionalDeepEnrich(query: string): boolean {
   return (
     /\btimeline\b/i.test(query) ||
-    /\bsequence of events\b/i.test(query)
+    /\bsequence of events\b/i.test(query) ||
+    /\bwalk me through\b/i.test(query) ||
+    /\bfrom the .+ to\b/i.test(query)
   );
 }
 
