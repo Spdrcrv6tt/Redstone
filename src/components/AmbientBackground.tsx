@@ -12,58 +12,47 @@ export function AmbientBackground({ active }: AmbientBackgroundProps) {
   const theme = useAppStore((s) => s.theme);
   const isDark = theme === "dark";
 
+  const fade = { duration: 0.55, ease: [0.4, 0, 0.2, 1] as const };
+
   return (
-    <div
-      className={[
-        "ambient-bg fixed inset-0 -z-10 overflow-hidden pointer-events-none select-none",
-        active ? "ambient-active" : "",
-      ].join(" ")}
-    >
+    <div className="ambient-bg fixed inset-0 overflow-hidden pointer-events-none select-none">
       <div className="ambient-base absolute inset-0" />
 
-      {/* Gemini-style top aurora — fades out once the user sends a message */}
       <motion.div
         className="ambient-gemini-sky absolute inset-x-0 top-0"
         initial={false}
         animate={{ opacity: active ? 1 : 0 }}
-        transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+        transition={fade}
         aria-hidden
       />
 
       <motion.div
-        className="ambient-aurora absolute inset-0"
+        className="ambient-aurora absolute inset-x-0 top-0 h-[55vh]"
         initial={false}
-        animate={{ opacity: active ? (isDark ? 0.45 : 0.55) : 0 }}
-        transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+        animate={{ opacity: active ? (isDark ? 0.7 : 0.5) : 0 }}
+        transition={fade}
       />
 
       <motion.div
         className={`ambient-orb ambient-orb-1 absolute rounded-full will-change-transform ${
           isDark
-            ? "top-[4%] left-[25%] w-[min(720px,90vw)] h-[min(280px,32vh)]"
-            : "top-[6%] left-1/2 -translate-x-1/2 w-[min(800px,92vw)] h-[min(260px,30vh)]"
+            ? "top-[2%] left-[20%] w-[min(760px,95vw)] h-[min(300px,34vh)]"
+            : "top-[4%] left-1/2 -translate-x-1/2 w-[min(820px,95vw)] h-[min(280px,32vh)]"
         }`}
         initial={false}
         animate={{ opacity: active ? 1 : 0 }}
-        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        transition={fade}
       />
 
       <motion.div
         className={`ambient-orb ambient-orb-2 absolute rounded-full will-change-transform ${
           isDark
-            ? "top-[2%] right-[8%] w-[min(520px,70vw)] h-[min(220px,26vh)]"
-            : "top-[4%] right-[12%] w-[min(480px,65vw)] h-[min(200px,24vh)]"
+            ? "top-[0%] right-[5%] w-[min(560px,75vw)] h-[min(240px,28vh)]"
+            : "top-[2%] right-[10%] w-[min(500px,70vw)] h-[min(220px,26vh)]"
         }`}
         initial={false}
-        animate={{ opacity: active ? 0.85 : 0 }}
-        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-      />
-
-      <motion.div
-        className="ambient-vignette absolute inset-0"
-        initial={false}
-        animate={{ opacity: active ? 1 : 0.35 }}
-        transition={{ duration: 0.55 }}
+        animate={{ opacity: active ? 0.9 : 0 }}
+        transition={fade}
       />
     </div>
   );
