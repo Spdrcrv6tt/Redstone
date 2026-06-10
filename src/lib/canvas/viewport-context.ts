@@ -1,3 +1,12 @@
+import {
+  CARD_WIDTH,
+  COLUMN_STRIDE,
+  LAYOUT_GAP,
+  ROW_STRIDE,
+  estimateNodeSize,
+  occupiedRects,
+  suggestNextPosition,
+} from "@/lib/canvas/layout";
 import type {
   CanvasBounds,
   CanvasDocument,
@@ -36,9 +45,6 @@ function nodeIntersectsBounds(
   );
 }
 
-const DEFAULT_NODE_W = 280;
-const DEFAULT_NODE_H = 160;
-
 export function buildViewportContext(
   doc: CanvasDocument,
   viewport: Viewport,
@@ -49,20 +55,29 @@ export function buildViewportContext(
 
   const allNodes = [...doc.nodes, ...doc.draftNodes];
   const allEdges = [...doc.edges, ...doc.draftEdges];
+  const allOccupied = occupiedRects(doc);
 
   const visibleIds = new Set<string>();
 
   const nodes = allNodes
-    .filter((n) =>
-      nodeIntersectsBounds(n.position, DEFAULT_NODE_W, DEFAULT_NODE_H, bounds)
-    )
+    .filter((n) => {
+      const size = estimateNodeSize(n);
+      return nodeIntersectsBounds(
+        n.position,
+        size.width,
+        size.height,
+        bounds
+      );
+    })
     .map((n) => {
       visibleIds.add(n.id);
+      const size = estimateNodeSize(n);
       return {
         id: n.id,
         kind: n.data.kind,
         layer: n.data.layer,
         position: { x: n.position.x, y: n.position.y },
+        size,
         title: n.data.title,
         body: n.data.body,
         imageUrl: n.data.imageUrl,
@@ -79,10 +94,25 @@ export function buildViewportContext(
       label: typeof e.label === "string" ? e.label : undefined,
     }));
 
+  const suggestedNext = suggestNextPosition(bounds, allOccupied);
+
   return {
     bounds,
     zoom: viewport.zoom,
     nodes,
     edges,
+    layout: {
+      cardWidth: CARD_WIDTH,
+      minGap: LAYOUT_GAP,
+      columnStride: COLUMN_STRIDE,
+      rowStride: ROW_STRIDE,
+      suggestedNext,
+      occupied: allOccupied.map((r) => ({
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+      })),
+    },
   };
 }

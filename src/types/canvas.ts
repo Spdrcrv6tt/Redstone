@@ -47,6 +47,7 @@ export interface CanvasViewportContext {
     kind: CanvasCardKind;
     layer: CanvasLayer;
     position: { x: number; y: number };
+    size?: { width: number; height: number };
     title?: string;
     body?: string;
     imageUrl?: string;
@@ -58,6 +59,19 @@ export interface CanvasViewportContext {
     target: string;
     label?: string;
   }>;
+  layout?: {
+    cardWidth: number;
+    minGap: number;
+    columnStride: number;
+    rowStride: number;
+    suggestedNext: { x: number; y: number };
+    occupied: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }>;
+  };
 }
 
 export type CanvasPatch =

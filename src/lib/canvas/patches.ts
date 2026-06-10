@@ -1,4 +1,5 @@
 import { EMPTY_CANVAS } from "@/lib/canvas/defaults";
+import { resolvePatchLayout } from "@/lib/canvas/layout";
 import type {
   CanvasDocument,
   CanvasLayer,
@@ -173,5 +174,7 @@ export function applyCanvasPatches(
   doc: CanvasDocument,
   patches: CanvasPatch[]
 ): CanvasDocument {
-  return patches.reduce(applyCanvasPatch, doc ?? EMPTY_CANVAS);
+  const base = doc ?? EMPTY_CANVAS;
+  const laidOut = resolvePatchLayout(base, patches);
+  return laidOut.reduce(applyCanvasPatch, base);
 }
