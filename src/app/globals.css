@@ -20,21 +20,21 @@
   --scrollbar: rgba(0, 0, 0, 0.12);
   --scrollbar-hover: rgba(0, 0, 0, 0.2);
 
-  --orb-1: rgba(199, 210, 254, 0.38);
-  --orb-2: rgba(186, 230, 253, 0.3);
-  --orb-3: rgba(167, 139, 250, 0.26);
-  --orb-4: rgba(125, 211, 252, 0.22);
-  --aurora-a: rgba(167, 139, 250, 0.12);
-  --aurora-b: rgba(125, 211, 252, 0.09);
-  --aurora-c: rgba(251, 207, 232, 0.07);
-  --aurora-d: rgba(129, 140, 248, 0.08);
-  --gemini-sky-a: rgba(96, 165, 250, 0.38);
-  --gemini-sky-b: rgba(129, 140, 248, 0.28);
-  --gemini-sky-c: rgba(45, 212, 191, 0.18);
-  --gemini-sky-alt-a: rgba(129, 140, 248, 0.32);
-  --gemini-sky-alt-b: rgba(56, 189, 248, 0.22);
-  --gemini-sky-alt-c: rgba(192, 132, 252, 0.14);
-  --aurora-bloom: rgba(99, 102, 241, 0.14);
+  --orb-1: rgba(147, 165, 250, 0.58);
+  --orb-2: rgba(125, 211, 252, 0.48);
+  --orb-3: rgba(167, 139, 250, 0.42);
+  --orb-4: rgba(96, 165, 250, 0.36);
+  --aurora-a: rgba(129, 140, 248, 0.22);
+  --aurora-b: rgba(56, 189, 248, 0.18);
+  --aurora-c: rgba(192, 132, 252, 0.14);
+  --aurora-d: rgba(99, 102, 241, 0.16);
+  --gemini-sky-a: rgba(59, 130, 246, 0.62);
+  --gemini-sky-b: rgba(99, 102, 241, 0.48);
+  --gemini-sky-c: rgba(45, 212, 191, 0.32);
+  --gemini-sky-alt-a: rgba(129, 140, 248, 0.5);
+  --gemini-sky-alt-b: rgba(56, 189, 248, 0.38);
+  --gemini-sky-alt-c: rgba(168, 85, 247, 0.28);
+  --aurora-bloom: rgba(99, 102, 241, 0.28);
   --ray-color: rgba(255, 255, 255, 0.45);
   --vignette: radial-gradient(ellipse 90% 80% at 50% 50%, transparent 50%, rgba(240, 244, 249, 0.5) 100%);
   --composer-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.04);
@@ -153,120 +153,69 @@
 
 /* ─── Ambient animations ─────────────────────────────────────────────────── */
 @keyframes orb-pulse-1 {
-  0%, 100% {
-    opacity: 0.32;
-    transform: scale(0.94) translate(0, 0);
-  }
-  28% {
-    opacity: 0.58;
-    transform: scale(1.05) translate(1.5%, -1%);
-  }
-  62% {
-    opacity: 0.42;
-    transform: scale(0.98) translate(-1%, 0.8%);
-  }
-  84% {
-    opacity: 0.52;
-    transform: scale(1.02) translate(0.5%, 0.4%);
-  }
+  0%, 100% { opacity: 0.34; }
+  28% { opacity: 0.62; }
+  62% { opacity: 0.44; }
+  84% { opacity: 0.54; }
 }
 
 @keyframes orb-pulse-2 {
-  0%, 100% {
-    opacity: 0.26;
-    transform: scale(0.96) translate(0, 0);
-  }
-  22% {
-    opacity: 0.48;
-    transform: scale(1.04) translate(-2%, 1.2%);
-  }
-  55% {
-    opacity: 0.34;
-    transform: scale(0.97) translate(1.5%, -0.6%);
-  }
-  78% {
-    opacity: 0.44;
-    transform: scale(1.03) translate(-0.8%, 0.5%);
-  }
+  0%, 100% { opacity: 0.28; }
+  22% { opacity: 0.52; }
+  55% { opacity: 0.36; }
+  78% { opacity: 0.46; }
 }
 
 @keyframes orb-pulse-3 {
-  0%, 100% {
-    opacity: 0.22;
-    transform: scale(0.95) translate(0, 0);
-  }
-  35% {
-    opacity: 0.4;
-    transform: scale(1.06) translate(1%, 1%);
-  }
-  68% {
-    opacity: 0.28;
-    transform: scale(0.96) translate(-1.2%, -0.4%);
-  }
+  0%, 100% { opacity: 0.24; }
+  35% { opacity: 0.44; }
+  68% { opacity: 0.3; }
 }
 
 @keyframes orb-pulse-4 {
-  0%, 100% {
-    opacity: 0.18;
-    transform: scale(0.97) translate(0, 0);
-  }
-  40% {
-    opacity: 0.36;
-    transform: scale(1.04) translate(-1%, 0.8%);
-  }
-  72% {
-    opacity: 0.24;
-    transform: scale(0.98) translate(0.8%, -0.5%);
-  }
+  0%, 100% { opacity: 0.2; }
+  40% { opacity: 0.4; }
+  72% { opacity: 0.26; }
 }
 
 @keyframes aurora-drift {
   0%, 100% {
     background-position: 0% 35%, 100% 55%, 48% 18%, 72% 42%;
     opacity: 0.55;
-    transform: scale(1) translate(0, 0);
   }
   18% {
     background-position: 22% 52%, 78% 38%, 62% 12%, 55% 58%;
     opacity: 0.78;
-    transform: scale(1.03) translate(0.8%, -0.4%);
   }
   38% {
     background-position: 48% 28%, 32% 68%, 88% 36%, 18% 48%;
     opacity: 0.62;
-    transform: scale(1.06) translate(-0.6%, 0.5%);
   }
   58% {
     background-position: 68% 62%, 14% 28%, 24% 52%, 82% 22%;
     opacity: 0.72;
-    transform: scale(1.02) translate(0.4%, 0.8%);
   }
   78% {
     background-position: 34% 18%, 88% 48%, 42% 72%, 64% 34%;
     opacity: 0.5;
-    transform: scale(0.98) translate(-0.5%, -0.3%);
   }
 }
 
 @keyframes gemini-sky-shift {
   0%, 100% {
     opacity: 0.62;
-    transform: scale(1) translateY(0);
     filter: hue-rotate(0deg) saturate(1) brightness(1);
   }
   20% {
     opacity: 0.88;
-    transform: scale(1.04) translateY(-1.5%);
     filter: hue-rotate(8deg) saturate(1.06) brightness(1.08);
   }
   45% {
     opacity: 0.55;
-    transform: scale(0.98) translateY(0.5%);
     filter: hue-rotate(-6deg) saturate(0.94) brightness(0.92);
   }
   70% {
     opacity: 0.8;
-    transform: scale(1.06) translateY(-0.8%);
     filter: hue-rotate(14deg) saturate(1.04) brightness(1.05);
   }
 }
@@ -274,44 +223,31 @@
 @keyframes gemini-sky-alt-shift {
   0%, 100% {
     opacity: 0.28;
-    transform: scale(1.02) translateY(0);
     filter: hue-rotate(0deg) saturate(1) brightness(1);
   }
   30% {
     opacity: 0.62;
-    transform: scale(1.08) translateY(-1%);
     filter: hue-rotate(-10deg) saturate(1.08) brightness(1.1);
   }
   55% {
     opacity: 0.38;
-    transform: scale(0.96) translateY(0.8%);
     filter: hue-rotate(12deg) saturate(0.92) brightness(0.9);
   }
   82% {
     opacity: 0.52;
-    transform: scale(1.04) translateY(-0.4%);
     filter: hue-rotate(-4deg) saturate(1.02) brightness(1.02);
   }
 }
 
 @keyframes sky-field-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.035); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.94; }
 }
 
 @keyframes bloom-pulse {
-  0%, 100% {
-    opacity: 0.35;
-    transform: scale(0.92) translate(0, 0);
-  }
-  33% {
-    opacity: 0.65;
-    transform: scale(1.08) translate(2%, -1%);
-  }
-  66% {
-    opacity: 0.45;
-    transform: scale(1.02) translate(-1.5%, 0.6%);
-  }
+  0%, 100% { opacity: 0.35; }
+  33% { opacity: 0.65; }
+  66% { opacity: 0.45; }
 }
 
 @keyframes orb-color-1 {
@@ -428,7 +364,8 @@
 }
 
 .ambient-sky-field {
-  transform-origin: 50% 0%;
+  top: -12%;
+  height: 112%;
   animation: sky-field-breathe 38s cubic-bezier(0.37, 0, 0.18, 1) infinite;
 }
 
@@ -463,7 +400,7 @@
     var(--aurora-bloom) 0%,
     transparent 72%
   );
-  filter: blur(28px);
+  filter: blur(40px);
 }
 
 .ambient-bloom-animate {
@@ -515,6 +452,56 @@
     orb-pulse-4 25s cubic-bezier(0.37, 0, 0.18, 1) infinite,
     orb-color-4 28s cubic-bezier(0.37, 0, 0.18, 1) infinite;
   animation-delay: -4s, -13s;
+}
+
+[data-theme="light"] .ambient-gemini-sky-animate {
+  animation-name: gemini-sky-shift-light;
+}
+
+[data-theme="light"] .ambient-gemini-sky-alt-animate {
+  animation-name: gemini-sky-alt-shift-light;
+}
+
+[data-theme="light"] .ambient-orb {
+  filter: blur(96px) saturate(1.18);
+}
+
+@keyframes gemini-sky-shift-light {
+  0%, 100% {
+    opacity: 0.78;
+    filter: hue-rotate(0deg) saturate(1.12) brightness(1.04);
+  }
+  20% {
+    opacity: 0.96;
+    filter: hue-rotate(8deg) saturate(1.18) brightness(1.1);
+  }
+  45% {
+    opacity: 0.68;
+    filter: hue-rotate(-6deg) saturate(1.05) brightness(0.98);
+  }
+  70% {
+    opacity: 0.9;
+    filter: hue-rotate(14deg) saturate(1.14) brightness(1.08);
+  }
+}
+
+@keyframes gemini-sky-alt-shift-light {
+  0%, 100% {
+    opacity: 0.42;
+    filter: hue-rotate(0deg) saturate(1.1) brightness(1.02);
+  }
+  30% {
+    opacity: 0.74;
+    filter: hue-rotate(-10deg) saturate(1.16) brightness(1.12);
+  }
+  55% {
+    opacity: 0.52;
+    filter: hue-rotate(12deg) saturate(1.04) brightness(0.96);
+  }
+  82% {
+    opacity: 0.64;
+    filter: hue-rotate(-4deg) saturate(1.1) brightness(1.04);
+  }
 }
 
 .ambient-ray {
