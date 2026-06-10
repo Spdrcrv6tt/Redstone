@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 import { SERVER_OLLAMA_HOST, CORS_HEADERS } from "@/lib/proxy";
 import { getComfyUIWorkflow } from "@/lib/comfy-workflow";
 import {
@@ -96,6 +97,9 @@ async function runGeneration(input: {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   let llmModel = DEFAULT_LLM_MODEL;
 
   try {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 import {
   configFromBody,
   upstreamHeaders,
@@ -360,6 +361,9 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();

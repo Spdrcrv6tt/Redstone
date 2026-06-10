@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -7,6 +8,9 @@ const COMFYUI_URL =
   process.env.COMFYUI_URL?.trim() || "http://127.0.0.1:8188";
 
 export async function GET(req: NextRequest) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const filename = req.nextUrl.searchParams.get("filename");
   if (!filename || /[\\/]/.test(filename)) {
     return new NextResponse("Invalid filename", { status: 400 });

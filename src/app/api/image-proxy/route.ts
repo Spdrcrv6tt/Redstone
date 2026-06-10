@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 import {
   fetchRemoteImage,
   isAllowedRemoteImageUrl,
@@ -10,6 +11,9 @@ export const runtime = "nodejs";
 const MAX_BYTES = 5 * 1024 * 1024;
 
 export async function GET(req: NextRequest) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const raw = req.nextUrl.searchParams.get("url");
   if (!raw || !isAllowedRemoteImageUrl(raw)) {
     return new NextResponse("Invalid URL", { status: 400 });

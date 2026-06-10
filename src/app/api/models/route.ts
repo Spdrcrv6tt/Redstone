@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth/guard";
 import {
   configFromBody,
   configFromSearch,
@@ -39,6 +40,9 @@ async function fetchTags(
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const { host, apiKey } = configFromSearch(req);
   try {
     return await fetchTags(host, "http://127.0.0.1:11434", apiKey);
@@ -49,6 +53,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();

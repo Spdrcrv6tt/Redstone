@@ -568,6 +568,7 @@
 .text-primary { color: var(--text-primary); }
 .text-secondary { color: var(--text-secondary); }
 .text-muted { color: var(--text-muted); }
+.bg-base { background: var(--bg-base); }
 .bg-surface { background: var(--surface); }
 .bg-surface-muted { background: var(--surface-muted); }
 .bg-surface-hover { background: var(--surface-hover); }

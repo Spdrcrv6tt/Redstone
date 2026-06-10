@@ -16,6 +16,7 @@ import {
   Cpu,
   Globe,
   Bug,
+  LogOut,
 } from "lucide-react";
 import { ModelPicker } from "@/components/ModelPicker";
 import type { SearchMode, Theme } from "@/types";
@@ -56,6 +57,12 @@ export function SettingsModal() {
   const save = () => {
     updateSettings(local);
     setSettingsOpen(false);
+  };
+
+  const signOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setSettingsOpen(false);
+    window.location.href = "/login";
   };
 
   const tempLabel =
@@ -390,9 +397,14 @@ export function SettingsModal() {
 
             {/* Footer */}
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-theme flex-shrink-0 bg-surface-muted/40">
-              <p className="text-[11px] text-muted hidden sm:block">
-                Changes apply after saving
-              </p>
+              <button
+                type="button"
+                onClick={signOut}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm btn-ghost rounded-xl text-secondary hover:text-primary"
+              >
+                <LogOut className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Sign out
+              </button>
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={() => setSettingsOpen(false)}
