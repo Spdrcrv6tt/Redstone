@@ -26,6 +26,8 @@ interface ModelPickerProps {
   emptyLabel?: string;
   /** Allow typing a model name not in the Ollama list */
   allowManualEntry?: boolean;
+  /** compact dropdown placement — composer should open downward */
+  menuPlacement?: "auto" | "bottom" | "top";
 }
 
 export function ModelPicker({
@@ -36,6 +38,7 @@ export function ModelPicker({
   allowEmpty = false,
   emptyLabel = "None",
   allowManualEntry = false,
+  menuPlacement = "auto",
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -69,12 +72,23 @@ export function ModelPicker({
       Math.max(12, rect.right - width),
       window.innerWidth - width - 12
     );
-    const spaceAbove = rect.top;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const above = spaceAbove > spaceBelow && spaceAbove > 160;
+    const menuMax = Math.min(420, window.innerHeight * 0.55);
+    const spaceAbove = rect.top - 8;
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+
+    let above = false;
+    if (menuPlacement === "top") {
+      above = true;
+    } else if (menuPlacement === "bottom") {
+      above = false;
+    } else {
+      above =
+        spaceBelow < Math.min(menuMax, 220) && spaceAbove > spaceBelow;
+    }
+
     const top = above ? rect.top - 8 : rect.bottom + 8;
     setPos({ top, left, width, above });
-  }, []);
+  }, [menuPlacement]);
 
   useEffect(() => {
     if (!open || variant !== "compact") return;
@@ -347,8 +361,7 @@ export function ModelPicker({
         type="button"
         onClick={openPicker}
         className={[
-          "flex items-center gap-1 px-3 py-2 md:px-2.5 md:py-1.5 rounded-full text-sm md:text-xs font-medium text-secondary min-h-[44px] md:min-h-0",
-          "hover:bg-surface-muted hover:text-primary transition-colors border border-transparent hover:border-theme",
+          "composer-control-btn composer-model-btn",
           className ?? "",
         ].join(" ")}
       >

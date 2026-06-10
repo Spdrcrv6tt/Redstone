@@ -66,7 +66,10 @@ export function InputComposer({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    const max = 180;
+    const next = Math.min(el.scrollHeight, max);
+    el.style.height = `${next}px`;
+    el.classList.toggle("composer-textarea--scroll", el.scrollHeight > max);
   };
 
   useEffect(() => {
@@ -111,7 +114,10 @@ export function InputComposer({
     setInput("");
     setAttachments([]);
     setFileError(null);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.classList.remove("composer-textarea--scroll");
+    }
   }, [input, attachments, isStreaming, disabled, onSend]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -214,12 +220,12 @@ export function InputComposer({
           )}
 
           <div className="composer-input-area px-2 py-2 md:px-3 md:py-2.5">
-            <div className="flex items-end gap-1 md:gap-1.5">
+            <div className="composer-input-row flex items-center gap-1 md:gap-1.5">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isStreaming || attachments.length >= MAX_FILES}
                 title="Attach files"
-                className="composer-icon-btn flex-shrink-0 rounded-full flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-muted transition-all duration-200 active:scale-95 disabled:opacity-40"
+                className="composer-icon-btn composer-control-btn disabled:opacity-40"
               >
                 <Plus className="w-5 h-5" strokeWidth={1.75} />
               </button>
@@ -243,14 +249,15 @@ export function InputComposer({
                 placeholder={placeholderText}
                 disabled={blocked || isStreaming}
                 rows={1}
-                className="flex-1 bg-transparent text-[length:var(--chat-text)] text-primary placeholder:text-muted resize-none outline-none leading-relaxed min-h-[44px] max-h-[180px] py-2.5 md:py-3"
+                className="composer-textarea flex-1 bg-transparent text-[length:var(--chat-text)] text-primary placeholder:text-muted outline-none max-h-[180px]"
               />
 
-              <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+              <div className="hidden md:flex items-center gap-1.5 flex-shrink-0 self-center">
                 <ModelPicker
                   value={currentModel}
                   onChange={handleModelChange}
                   variant="compact"
+                  menuPlacement="bottom"
                 />
                 {isStreaming ? (
                   <button
@@ -278,6 +285,7 @@ export function InputComposer({
                 value={currentModel}
                 onChange={handleModelChange}
                 variant="compact"
+                menuPlacement="bottom"
                 className="composer-model-mobile"
               />
               {isStreaming ? (
