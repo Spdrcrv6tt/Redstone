@@ -152,6 +152,9 @@ export function applyCanvasPatch(
           title: patch.title,
           widgetSpec: patch.spec,
           widgetHeight: patch.height ?? "280px",
+          autoSize: false,
+          cardWidth: 300,
+          cardHeight: 300,
         },
       };
       if (layer === "draft") {

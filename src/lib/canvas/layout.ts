@@ -35,8 +35,16 @@ function textLength(patch: {
 
 /** Rough card footprint for overlap checks — matches canvas-card CSS. */
 export function estimateNodeSize(node: {
+  width?: number;
+  height?: number;
   data: CanvasNode["data"];
 }): { width: number; height: number } {
+  if (node.data.cardWidth && node.data.cardHeight) {
+    return { width: node.data.cardWidth, height: node.data.cardHeight };
+  }
+  if (node.width && node.height) {
+    return { width: node.width, height: node.height };
+  }
   const chars =
     (node.data.title?.length ?? 0) +
     (node.data.body?.length ?? 0) +

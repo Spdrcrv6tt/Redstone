@@ -72,6 +72,16 @@ interface AppState {
     nodeId: string,
     data: Partial<CanvasCardData>
   ) => void;
+  updateCanvasNodeLayout: (
+    conversationId: string,
+    nodeId: string,
+    layout: {
+      width?: number;
+      height?: number;
+      autoSize?: boolean;
+    }
+  ) => void;
+  deleteCanvasNode: (conversationId: string, nodeId: string) => void;
 }
 
 export const PREFERRED_DEFAULT_MODEL = "gemma4:12b";
@@ -275,6 +285,50 @@ export const useAppStore = create<AppState>()(
             };
           }),
         }));
+      },
+
+      updateCanvasNodeLayout: (conversationId, nodeId, layout) => {
+        set((s) => ({
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            const canvas = c.canvas ?? EMPTY_CANVAS;
+            const patchNode = (nodes: typeof canvas.nodes) =>
+              nodes.map((n) => {
+                if (n.id !== nodeId) return n;
+                const width = layout.width ?? n.width ?? n.data.cardWidth;
+                const height = layout.height ?? n.height ?? n.data.cardHeight;
+                return {
+                  ...n,
+                  width,
+                  height,
+                  data: {
+                    ...n.data,
+                    autoSize:
+                      layout.autoSize !== undefined
+                        ? layout.autoSize
+                        : n.data.autoSize,
+                    cardWidth: width,
+                    cardHeight: height,
+                  },
+                };
+              });
+            return {
+              ...c,
+              canvas: {
+                ...canvas,
+                nodes: patchNode(canvas.nodes),
+                draftNodes: patchNode(canvas.draftNodes),
+              },
+              updatedAt: Date.now(),
+            };
+          }),
+        }));
+      },
+
+      deleteCanvasNode: (conversationId, nodeId) => {
+        get().applyCanvasPatches(conversationId, [
+          { op: "delete_node", id: nodeId },
+        ]);
       },
     }),
     {

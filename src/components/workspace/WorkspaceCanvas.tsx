@@ -37,7 +37,11 @@ interface WorkspaceCanvasInnerProps {
 }
 
 function mergeFlowNodes(doc: CanvasDocument): Node<CanvasCardData>[] {
-  return [...doc.nodes, ...doc.draftNodes];
+  return [...doc.nodes, ...doc.draftNodes].map((n) => ({
+    ...n,
+    width: n.width ?? n.data.cardWidth,
+    height: n.height ?? n.data.cardHeight,
+  }));
 }
 
 function mergeFlowEdges(doc: CanvasDocument): Edge[] {

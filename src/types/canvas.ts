@@ -35,6 +35,10 @@ export interface CanvasCardData extends Record<string, unknown> {
   /** Cached builder HTML — persisted on the node. */
   widgetHtml?: string;
   widgetHeight?: string;
+  /** When true (default), card height/width follow content measurements. */
+  autoSize?: boolean;
+  cardWidth?: number;
+  cardHeight?: number;
 }
 
 export type CanvasNode = Node<CanvasCardData>;

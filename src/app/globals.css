@@ -640,31 +640,45 @@
 }
 
 .composer-surface--thinking-canvas {
-  border-width: 2px;
-  animation: composer-canvas-thinking 1.1s ease-in-out infinite;
+  border-color: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
-@keyframes composer-canvas-thinking {
-  0%, 100% {
-    border-color: #ff0033;
-    box-shadow:
-      0 0 0 1px rgba(255, 0, 51, 0.35),
-      0 0 20px rgba(255, 0, 51, 0.28),
-      0 0 40px rgba(255, 0, 51, 0.12);
-  }
-  33% {
-    border-color: #00e636;
-    box-shadow:
-      0 0 0 1px rgba(0, 230, 54, 0.35),
-      0 0 22px rgba(0, 230, 54, 0.32),
-      0 0 44px rgba(0, 230, 54, 0.14);
-  }
-  66% {
-    border-color: #1a7fff;
-    box-shadow:
-      0 0 0 1px rgba(26, 127, 255, 0.35),
-      0 0 22px rgba(26, 127, 255, 0.32),
-      0 0 44px rgba(26, 127, 255, 0.14);
+.composer-surface--thinking-canvas::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 30px;
+  background: conic-gradient(
+    from 0deg,
+    #b87a8a,
+    #7a9e86,
+    #7a8fb8,
+    #a88a7a,
+    #b87a8a
+  );
+  animation: composer-canvas-border-spin 2.8s linear infinite;
+  z-index: 0;
+}
+
+.composer-surface--thinking-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: var(--surface);
+  z-index: 0;
+}
+
+.composer-surface--thinking-canvas > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes composer-canvas-border-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -1217,7 +1231,7 @@ button.source-cite {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .composer-surface--thinking-canvas {
+  .composer-surface--thinking-canvas::before {
     animation: none !important;
   }
 }
@@ -1830,13 +1844,123 @@ button.source-cite {
 }
 
 .canvas-card {
-  min-width: 220px;
-  max-width: 320px;
+  box-sizing: border-box;
+  position: relative;
+  min-width: 180px;
+  max-width: 480px;
   padding: 0.75rem 0.875rem;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.canvas-card-content {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.canvas-card-resizer-line {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent) !important;
+}
+
+.canvas-card-resizer-handle {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 2px !important;
+  background: var(--accent) !important;
+  border: 2px solid var(--surface) !important;
+}
+
+.canvas-card-menu {
+  position: fixed;
+  z-index: 300;
+  min-width: 10rem;
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.canvas-card-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  transition: background 0.12s ease;
+}
+
+.canvas-card-menu-item:hover {
+  background: var(--surface-hover);
+}
+
+.canvas-card-menu-item--danger {
+  color: #f87171;
+}
+
+.canvas-json-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.canvas-json-modal {
+  width: min(36rem, 100%);
+  max-height: min(28rem, 80vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+}
+
+.canvas-json-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.canvas-json-modal-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.canvas-json-modal-close {
+  padding: 0.35rem;
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+
+.canvas-json-modal-close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.canvas-json-modal-body {
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .canvas-card--draft {
@@ -1873,10 +1997,12 @@ button.source-cite {
 .canvas-card-image {
   display: block;
   width: 100%;
+  height: auto;
   border-radius: 10px;
   margin-top: 0.35rem;
-  object-fit: cover;
-  max-height: 180px;
+  object-fit: contain;
+  max-height: 320px;
+  background: color-mix(in srgb, var(--surface-muted) 80%, transparent);
 }
 
 .canvas-card-markdown {
@@ -1893,7 +2019,7 @@ button.source-cite {
 
 .canvas-card--widget {
   min-width: 300px;
-  max-width: 340px;
+  max-width: 480px;
   padding: 0.5rem 0.625rem 0.625rem;
 }
 
