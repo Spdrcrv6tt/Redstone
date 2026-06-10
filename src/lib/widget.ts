@@ -97,7 +97,7 @@ export function parseWidgetArchitectSpec(raw: string): WidgetArchitectSpec | nul
   if (!spec) return null;
 
   const height =
-    typeof propsRecord.height === "string" ? propsRecord.height : "600px";
+    typeof propsRecord.height === "string" ? propsRecord.height : "65vh";
 
   return {
     component: "DynamicWidget",

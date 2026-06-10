@@ -12,7 +12,7 @@ interface DynamicWidgetLoaderProps {
 
 export function DynamicWidgetLoader({
   spec,
-  height = "600px",
+  height = "65vh",
   model: modelProp,
 }: DynamicWidgetLoaderProps) {
   const settings = useAppStore((s) => s.settings);
@@ -68,17 +68,26 @@ export function DynamicWidgetLoader({
   }, [spec, model, settings.ollamaHost, settings.apiKey]);
 
   const srcDoc = useMemo(
-    () => (html ? normalizeDiagramHtml(html) : ""),
+    () => (html ? normalizeDiagramHtml(html, { widgetViewport: true }) : ""),
     [html]
   );
 
+  const resolveHeightPx = useCallback((h: string) => {
+    if (typeof window === "undefined") return 520;
+    const vh = h.match(/^([\d.]+)vh$/i);
+    if (vh) return (window.innerHeight * Number.parseFloat(vh[1])) / 100;
+    const px = Number.parseInt(h, 10);
+    return Number.isFinite(px) ? px : 520;
+  }, []);
+
   const clampHeight = useCallback(
     (value: number) => {
-      const parsed = Number.parseInt(height, 10);
-      const max = Number.isFinite(parsed) ? parsed + 80 : 720;
-      return Math.min(max, Math.max(240, value + 16));
+      const target = resolveHeightPx(height);
+      const maxOnScreen =
+        typeof window !== "undefined" ? window.innerHeight * 0.85 : target;
+      return Math.min(maxOnScreen, target, Math.max(240, value));
     },
-    [height]
+    [height, resolveHeightPx]
   );
 
   useEffect(() => {

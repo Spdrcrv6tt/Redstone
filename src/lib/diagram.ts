@@ -133,20 +133,32 @@ export function stripDiagramBlocks(text: string): string {
     .trim();
 }
 
+const WIDGET_VIEWPORT_CSS = `html,body{height:100%;margin:0;padding:0;overflow:hidden;background:#0f1117;color:#e2e8f0;box-sizing:border-box;}
+body{display:flex;flex-direction:column;min-height:100vh;max-height:100vh;}
+.canvas,[data-widget-canvas],main.visualization,#canvas{flex:1 1 auto;flex-grow:1;min-height:50vh;min-height:0;width:100%;overflow:hidden;}
+.controls,[data-widget-controls],.toolbar,.readout,.legend{flex:0 0 auto;padding:0.5rem 0.75rem;font-size:0.8125rem;line-height:1.3;}
+*,*::before,*::after{box-sizing:inherit;}`;
+
 /** Wrap fragment HTML in a minimal document and report height to the parent frame. */
-export function normalizeDiagramHtml(html: string): string {
+export function normalizeDiagramHtml(
+  html: string,
+  options?: { widgetViewport?: boolean }
+): string {
   const trimmed = html.trim();
   if (!trimmed) {
     return "<!DOCTYPE html><html><body></body></html>";
   }
 
+  const widgetViewport = options?.widgetViewport === true;
   const resizeScript = `<script>
 (function () {
   function report() {
-    var h = Math.max(
+    var viewport = window.innerHeight || document.documentElement.clientHeight || 0;
+    var content = Math.max(
       document.documentElement.scrollHeight,
       document.body ? document.body.scrollHeight : 0
     );
+    var h = ${widgetViewport ? "viewport || content" : "content"};
     parent.postMessage({ type: "redstone-diagram-height", height: h }, "*");
   }
   window.addEventListener("load", report);
@@ -155,19 +167,35 @@ export function normalizeDiagramHtml(html: string): string {
 })();
 </script>`;
 
+  const viewportStyle = widgetViewport
+    ? `<style id="redstone-widget-layout">${WIDGET_VIEWPORT_CSS}</style>`
+    : "";
+
   if (/<!DOCTYPE|<html/i.test(trimmed)) {
-    if (/<\/body>/i.test(trimmed)) {
-      return trimmed.replace(/<\/body>/i, `${resizeScript}</body>`);
+    let doc = trimmed;
+    if (widgetViewport && viewportStyle) {
+      if (/<head[^>]*>/i.test(doc)) {
+        doc = doc.replace(/<head[^>]*>/i, (m) => `${m}\n${viewportStyle}`);
+      } else {
+        doc = doc.replace(/<html[^>]*>/i, (m) => `${m}<head>${viewportStyle}</head>`);
+      }
     }
-    return `${trimmed}${resizeScript}`;
+    if (/<\/body>/i.test(doc)) {
+      return doc.replace(/<\/body>/i, `${resizeScript}</body>`);
+    }
+    return `${doc}${resizeScript}`;
   }
+
+  const baseStyle = widgetViewport
+    ? WIDGET_VIEWPORT_CSS
+    : "html,body{margin:0;padding:0;}";
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>html,body{margin:0;padding:0;}</style>
+<style>${baseStyle}</style>
 </head>
 <body>
 ${trimmed}

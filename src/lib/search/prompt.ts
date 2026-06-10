@@ -183,13 +183,14 @@ JSON SCHEMA:
 {
   "component": "DynamicWidget",
   "props": {
-    "height": "600px",
-    "spec": "Write a highly detailed, 3-4 sentence prompt for a frontend developer. Describe the visual layout, the exact data to include, the required interactive controls (sliders, buttons), and the exact behavior of the animation/simulation."
+    "height": "65vh",
+    "spec": "Write a highly detailed, 3-4 sentence prompt for a frontend developer. Describe the visual layout, the exact data to include, the required interactive controls (sliders, buttons), and the exact behavior of the animation/simulation. Require a viewport-fit layout: main canvas uses flex-grow: 1 (min-height 50vh), controls/readouts stay compact, and the entire widget fits on screen at once without page scroll."
   }
 }
 </redstone-widget>
 
-The spec field is the most important part. Be precise about labels, numbers, phases, controls, and animation behavior. Use facts from your knowledge and any external data provided.`;
+The spec field is the most important part. Be precise about labels, numbers, phases, controls, and animation behavior. Use facts from your knowledge and any external data provided.
+Prefer height "65vh" (or similar viewport units) so the widget fits on screen. Always tell the builder to use a flex column layout with a flex-grow canvas and compact control rows.`;
 
 /** Dedicated system prompt for interactive widget turns — architect pass only. */
 export function buildDiagramSystemPrompt(

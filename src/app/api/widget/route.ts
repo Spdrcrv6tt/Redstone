@@ -13,7 +13,13 @@ const BUILDER_SYSTEM = `You are an expert frontend developer.
 Generate a single-file, interactive HTML document using vanilla HTML, CSS, and JS based on the user's specification.
 - Use CDN links for libraries like TailwindCSS, D3.js, Chart.js, or Anime.js if helpful.
 - Use a dark theme (#0f1117 background, light text).
-- Return ONLY the raw HTML code. No markdown formatting, no \`\`\`html code blocks. Start immediately with <!DOCTYPE html>.`;
+- Return ONLY the raw HTML code. No markdown formatting, no \`\`\`html code blocks. Start immediately with <!DOCTYPE html>.
+
+LAYOUT (required — everything must fit on screen at once, no page scroll):
+- Set html, body { height: 100%; margin: 0; overflow: hidden; } and body { display: flex; flex-direction: column; min-height: 100vh; max-height: 100vh; box-sizing: border-box; }.
+- Put the main visualization in a dedicated container (class="canvas" or data-widget-canvas) with flex-grow: 1, flex: 1 1 auto, min-height: 50vh, min-height: 0, width: 100%, and overflow: hidden (scale or letterbox inside if needed).
+- Keep control panels, legends, and data readouts compact: flex: 0 0 auto, small padding (0.5rem), font-size 0.75rem–0.875rem, single tight rows where possible.
+- Do not rely on vertical page scrolling; fit all UI within the viewport height.`;
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
