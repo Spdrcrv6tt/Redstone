@@ -92,7 +92,28 @@ function WorkspaceCanvasInner({
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
       const nextAll = applyNodeChanges(changes, nodes) as Node<CanvasCardData>[];
-      const { nodes: main, draftNodes } = splitNodes(nextAll);
+      const synced = nextAll.map((n) => {
+        const w = n.width ?? n.data.cardWidth;
+        const h = n.height ?? n.data.cardHeight;
+        const dimChange = changes.some(
+          (c) => c.type === "dimensions" && "id" in c && c.id === n.id
+        );
+        if (!dimChange || (w === n.data.cardWidth && h === n.data.cardHeight)) {
+          return n;
+        }
+        return {
+          ...n,
+          width: w,
+          height: h,
+          data: {
+            ...n.data,
+            cardWidth: w,
+            cardHeight: h,
+            autoSize: false,
+          },
+        };
+      });
+      const { nodes: main, draftNodes } = splitNodes(synced);
       setCanvasDocument(conversationId, {
         ...doc,
         nodes: main,

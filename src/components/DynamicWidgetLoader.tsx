@@ -14,6 +14,11 @@ interface DynamicWidgetLoaderProps {
   nodeId?: string;
   variant?: "chat" | "canvas";
   onIframeReady?: (win: Window) => void;
+  /** Stretch iframe to the card content area (manual resize). */
+  fillContainer?: boolean;
+  /** Report intrinsic height while the card is auto-sizing. */
+  autoMeasure?: boolean;
+  onMeasuredHeight?: (height: number) => void;
 }
 
 export function DynamicWidgetLoader({
@@ -25,13 +30,18 @@ export function DynamicWidgetLoader({
   nodeId,
   variant = "chat",
   onIframeReady,
+  fillContainer = false,
+  autoMeasure = false,
+  onMeasuredHeight,
 }: DynamicWidgetLoaderProps) {
   const settings = useAppStore((s) => s.settings);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const onBuiltRef = useRef(onBuilt);
   const onIframeReadyRef = useRef(onIframeReady);
+  const onMeasuredHeightRef = useRef(onMeasuredHeight);
   onBuiltRef.current = onBuilt;
   onIframeReadyRef.current = onIframeReady;
+  onMeasuredHeightRef.current = onMeasuredHeight;
   const [html, setHtml] = useState<string | null>(cachedHtml ?? null);
   const [loading, setLoading] = useState(!cachedHtml);
   const [error, setError] = useState<string | null>(null);
@@ -114,13 +124,16 @@ export function DynamicWidgetLoader({
 
   const clampHeight = useCallback(
     (value: number) => {
+      if (isCanvas && (autoMeasure || fillContainer)) {
+        return Math.max(200, value);
+      }
       const target = resolveHeightPx(height);
       if (isCanvas) return Math.min(target, Math.max(200, value));
       const maxOnScreen =
         typeof window !== "undefined" ? window.innerHeight * 0.85 : target;
       return Math.min(maxOnScreen, target, Math.max(240, value));
     },
-    [height, isCanvas, resolveHeightPx]
+    [autoMeasure, fillContainer, height, isCanvas, resolveHeightPx]
   );
 
   useEffect(() => {
@@ -131,13 +144,19 @@ export function DynamicWidgetLoader({
         data?.type === "redstone-diagram-height" &&
         typeof data.height === "number"
       ) {
-        setIframeHeight(`${clampHeight(data.height)}px`);
+        const next = clampHeight(data.height);
+        if (autoMeasure) {
+          onMeasuredHeightRef.current?.(next);
+        }
+        if (!fillContainer) {
+          setIframeHeight(`${next}px`);
+        }
       }
     };
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [clampHeight]);
+  }, [autoMeasure, clampHeight, fillContainer]);
 
   const handleIframeLoad = useCallback(() => {
     const win = iframeRef.current?.contentWindow;
@@ -182,8 +201,11 @@ export function DynamicWidgetLoader({
         srcDoc={srcDoc}
         sandbox="allow-scripts allow-same-origin"
         onLoad={handleIframeLoad}
-        className="canvas-widget-iframe"
-        style={{ height: iframeHeight }}
+        className={[
+          "canvas-widget-iframe",
+          fillContainer ? "canvas-widget-iframe--fill" : "",
+        ].join(" ")}
+        style={fillContainer ? undefined : { height: iframeHeight }}
         loading="lazy"
       />
     );

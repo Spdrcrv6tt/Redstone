@@ -1871,6 +1871,13 @@ button.source-cite {
   overflow: auto;
 }
 
+.canvas-card-content--widget {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .canvas-card-resizer-line {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent) !important;
 }
@@ -2028,8 +2035,9 @@ button.source-cite {
 
 .canvas-card--widget {
   min-width: 300px;
-  max-width: 480px;
   padding: 0.5rem 0.625rem 0.625rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .canvas-widget-iframe {
@@ -2039,6 +2047,12 @@ button.source-cite {
   border: none;
   border-radius: 10px;
   background: #0f1117;
+}
+
+.canvas-widget-iframe--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .canvas-widget-loader {

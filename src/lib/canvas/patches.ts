@@ -63,9 +63,13 @@ export function applyCanvasPatch(
             ? {
                 widgetSpec: patch.widgetSpec,
                 widgetHeight: patch.widgetHeight ?? "280px",
+                autoSize: true,
               }
             : {}),
         },
+        ...(patch.kind === "widget" || patch.widgetSpec
+          ? { width: 360, height: 280 }
+          : {}),
       };
       if (layer === "draft") {
         next.draftNodes = upsertNode(next.draftNodes, node);
@@ -152,10 +156,10 @@ export function applyCanvasPatch(
           title: patch.title,
           widgetSpec: patch.spec,
           widgetHeight: patch.height ?? "280px",
-          autoSize: false,
-          cardWidth: 300,
-          cardHeight: 300,
+          autoSize: true,
         },
+        width: 360,
+        height: 280,
       };
       if (layer === "draft") {
         next.draftNodes = upsertNode(next.draftNodes, node);

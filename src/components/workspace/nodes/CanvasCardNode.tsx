@@ -29,8 +29,15 @@ import type { CanvasCardData, CanvasNode } from "@/types/canvas";
 const CARD_MIN_W = 180;
 const CARD_MIN_H = 72;
 const CARD_MAX_W = 480;
+const CARD_WIDGET_MAX_W = 720;
+const CARD_WIDGET_DEFAULT_W = 360;
 
-function CanvasCardNodeComponent({ data, selected }: NodeProps) {
+function CanvasCardNodeComponent({
+  data,
+  selected,
+  width: nodeWidth,
+  height: nodeHeight,
+}: NodeProps) {
   const card = data as CanvasCardData;
   const nodeId = useNodeId() ?? "";
   const { conversationId } = useCanvasWorkspace();
@@ -43,9 +50,13 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
   const deleteCanvasNode = useAppStore((s) => s.deleteCanvasNode);
 
   const isDraft = card.layer === "draft";
-  const autoSize = card.autoSize !== false && card.kind !== "widget";
-  const width = card.cardWidth ?? CARD_MIN_W;
-  const height = card.cardHeight;
+  const autoSize = card.autoSize !== false;
+  const isWidget = card.kind === "widget";
+  const maxW = isWidget ? CARD_WIDGET_MAX_W : CARD_MAX_W;
+  const defaultW = isWidget ? CARD_WIDGET_DEFAULT_W : CARD_MIN_W;
+  const effectiveWidth = Math.round(nodeWidth ?? card.cardWidth ?? defaultW);
+  const effectiveHeight = Math.round(nodeHeight ?? card.cardHeight ?? 0) || undefined;
+  const fillWidget = isWidget && !autoSize && !!effectiveHeight;
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [showJson, setShowJson] = useState(false);
@@ -73,6 +84,41 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
     [bridge, nodeId]
   );
 
+  const handleWidgetMeasured = useCallback(
+    (contentHeight: number) => {
+      if (!autoSize || !conversationId || !nodeId) return;
+      const titleExtra = card.title ? 24 : 0;
+      const pad = 20;
+      const nextH = Math.max(CARD_MIN_H, Math.round(contentHeight + titleExtra + pad));
+      const nextW = Math.min(
+        maxW,
+        Math.max(isWidget ? 300 : CARD_MIN_W, card.cardWidth ?? defaultW)
+      );
+      if (
+        Math.abs((card.cardHeight ?? 0) - nextH) > 4 ||
+        Math.abs((card.cardWidth ?? 0) - nextW) > 4
+      ) {
+        updateCanvasNodeLayout(conversationId, nodeId, {
+          width: nextW,
+          height: nextH,
+          autoSize: true,
+        });
+      }
+    },
+    [
+      autoSize,
+      card.cardHeight,
+      card.cardWidth,
+      card.title,
+      conversationId,
+      defaultW,
+      isWidget,
+      maxW,
+      nodeId,
+      updateCanvasNodeLayout,
+    ]
+  );
+
   useEffect(() => {
     return () => {
       if (nodeId) bridge?.unregister(nodeId);
@@ -80,11 +126,11 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
   }, [bridge, nodeId]);
 
   const measureContent = useCallback(() => {
-    if (!autoSize || !contentRef.current || !conversationId || !nodeId) {
+    if (!autoSize || isWidget || !contentRef.current || !conversationId || !nodeId) {
       return;
     }
     const el = contentRef.current;
-    const nextW = Math.min(CARD_MAX_W, Math.max(CARD_MIN_W, el.scrollWidth + 2));
+    const nextW = Math.min(maxW, Math.max(CARD_MIN_W, el.scrollWidth + 2));
     const nextH = Math.max(CARD_MIN_H, el.scrollHeight + 2);
     if (
       Math.abs((card.cardWidth ?? 0) - nextW) > 2 ||
@@ -101,6 +147,8 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
     card.cardHeight,
     card.cardWidth,
     conversationId,
+    isWidget,
+    maxW,
     nodeId,
     updateCanvasNodeLayout,
   ]);
@@ -140,9 +188,9 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
       {selected ? (
         <NodeResizeControl
           position="bottom-right"
-          minWidth={CARD_MIN_W}
+          minWidth={isWidget ? 300 : CARD_MIN_W}
           minHeight={CARD_MIN_H}
-          maxWidth={CARD_MAX_W}
+          maxWidth={maxW}
           className="canvas-card-resizer-handle"
           onResizeEnd={(_event, params) => {
             if (!conversationId || !nodeId) return;
@@ -163,15 +211,23 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
           `canvas-card--${card.kind}`,
         ].join(" ")}
         style={{
-          width: width ? `${width}px` : undefined,
-          height: height ? `${height}px` : undefined,
+          width: `${effectiveWidth}px`,
+          maxWidth: autoSize ? `${maxW}px` : `${effectiveWidth}px`,
+          height: effectiveHeight ? `${effectiveHeight}px` : undefined,
+          minHeight: effectiveHeight ? undefined : `${CARD_MIN_H}px`,
         }}
         onContextMenu={handleContextMenu}
       >
         <Handle type="target" position={Position.Left} className="canvas-card-handle" />
         <Handle type="source" position={Position.Right} className="canvas-card-handle" />
 
-        <div ref={contentRef} className="canvas-card-content">
+        <div
+          ref={contentRef}
+          className={[
+            "canvas-card-content",
+            isWidget ? "canvas-card-content--widget" : "",
+          ].join(" ")}
+        >
           {card.title ? (
             <p className="canvas-card-title">{card.title}</p>
           ) : null}
@@ -199,6 +255,9 @@ function CanvasCardNodeComponent({ data, selected }: NodeProps) {
               spec={card.widgetSpec}
               height={card.widgetHeight ?? "280px"}
               cachedHtml={card.widgetHtml}
+              fillContainer={fillWidget}
+              autoMeasure={autoSize}
+              onMeasuredHeight={handleWidgetMeasured}
               onBuilt={handleWidgetBuilt}
               onIframeReady={handleIframeReady}
             />
