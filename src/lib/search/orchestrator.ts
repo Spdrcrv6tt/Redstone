@@ -27,11 +27,16 @@ Reply with ONLY valid JSON, no markdown:
 {"web_search":boolean,"web_query":"search query or empty","image_search":boolean,"image_query":"image subject or empty","reason":"one short phrase"}
 
 Rules:
+- web_search and image_search are INDEPENDENT — both can be true at the same time.
 - web_query: concise Brave query when web_search is true.
-- image_query: specific subject for photo search when image_search is true (e.g. "SL-1 nuclear reactor Idaho", "Neil Armstrong official portrait").
-- Use image_search for "tell me about [thing/person]" when a photo would help.
-- Use neither for hello, thanks, code, rewrite, or general chat.
-- Prefer web_search for factual/historical questions about named entities.`;
+- image_query: a precise, specific subject for the photo search when image_search is true.
+  - ALWAYS include disambiguating terms so the right object is found.
+  - If the subject is fictional (movie/TV/book), add the franchise name: "USS Enterprise NCC-1701-D Star Trek starship", "Millennium Falcon Star Wars spacecraft".
+  - If the subject shares a name with something real, specify which one: "Apollo 11 Saturn V rocket launch" not "Apollo 11".
+  - Examples: "SL-1 nuclear reactor Idaho", "Neil Armstrong NASA portrait", "F-14 Tomcat fighter jet VF-84".
+- Use image_search when the user asks about or asks to see a physical object, vessel, aircraft, person, place, or fictional vehicle/ship — a photo adds clear value.
+- Use BOTH web_search and image_search together for "tell me about [thing]" queries where facts AND a visual are useful.
+- Use neither for hello, thanks, code rewrites, math, or general chat.`;
 
 /** Strip <think>…</think> blocks that Qwen3 and similar models prepend. */
 function stripThinking(text: string): string {
