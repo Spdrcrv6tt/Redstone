@@ -114,6 +114,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   let orchestratorMeta: OrchestratorDecisionMeta | undefined;
   let overrideWebQuery = "";
   let overrideImagePlan: ImageSearchPlan | null = null;
+  // When watchdog explicitly decides no image, suppress the heuristic plan.
+  let watchdogSuppressImage = false;
 
   if (searchMode === "aggressive") {
     emitStatus("Analyzing request…", "orchestrate");
@@ -152,6 +154,9 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
             orch.imageQuery,
             priorImageUrls
           );
+        } else {
+          // Watchdog explicitly ruled out images — don't let heuristics override.
+          watchdogSuppressImage = true;
         }
       } else {
         runWebSearch = draftPlan.needsWebSearch;
@@ -229,8 +234,9 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     priorImageUrls
   );
 
-  const imagePlan =
-    overrideImagePlan ?? turnPlan.imageSearch;
+  const imagePlan = watchdogSuppressImage
+    ? null
+    : overrideImagePlan ?? turnPlan.imageSearch;
 
   if (imagePlan && braveKey) {
     emitStatus("Finding images…", "image");
