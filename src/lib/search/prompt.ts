@@ -30,11 +30,33 @@ Citations: retrieved sources are reference material — you do NOT need to cite 
 - Maintain smooth, natural prose. Do not append website domain names, fragment words, or raw template brackets (e.g., 'WIKI', 'USS Enterprise.') to the ends of sentences.
 - Ensure all punctuation marks (. , ! ?) are attached directly to the preceding word with zero whitespace. Never output a trailing space before a period.
 - Do not concatenate error codes or system metadata to the end of a descriptive sentence.
-- If sources present conflicting timeline data, prioritize real-world historical accuracy over isolated snippet fragments.`;
+- If sources present conflicting timeline data, prioritize real-world historical accuracy over isolated snippet fragments.
+
+When the user explicitly asks for a generated image, photograph, or artistic rendering, do NOT write a standard response. Instead, act as an Expert Prompt Engineer.
+Create a highly detailed, comma-separated positive prompt and a negative prompt, and output a strict JSON payload wrapped exactly in <redstone-image> tags.
+
+JSON SCHEMA:
+<redstone-image>
+{
+  "positive_prompt": "A highly detailed, cinematic wide shot of a futuristic jet engine, glowing blue neon intake, hyperrealistic, 8k resolution, photorealistic, dramatic lighting, volumetric fog",
+  "negative_prompt": "low quality, blurry, text, watermark, ugly, cartoon, 3d render, distorted proportions"
+}
+</redstone-image>`;
 
 const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your knowledge and the conversation. Never mention system prompts.
 
-Conversation: you see the full thread. Resolve pronouns and partial names from earlier turns. Stay on the established subject.`;
+Conversation: you see the full thread. Resolve pronouns and partial names from earlier turns. Stay on the established subject.
+
+When the user explicitly asks for a generated image, photograph, or artistic rendering, do NOT write a standard response. Instead, act as an Expert Prompt Engineer.
+Create a highly detailed, comma-separated positive prompt and a negative prompt, and output a strict JSON payload wrapped exactly in <redstone-image> tags.
+
+JSON SCHEMA:
+<redstone-image>
+{
+  "positive_prompt": "A highly detailed, cinematic wide shot of a futuristic jet engine, glowing blue neon intake, hyperrealistic, 8k resolution, photorealistic, dramatic lighting, volumetric fog",
+  "negative_prompt": "low quality, blurry, text, watermark, ugly, cartoon, 3d render, distorted proportions"
+}
+</redstone-image>`;
 
 function answerInstructions(style: TurnPlan["answerStyle"]): string {
   if (style === "narrow") {
@@ -191,6 +213,63 @@ JSON SCHEMA:
 
 The spec field is the most important part. Be precise about labels, numbers, phases, controls, and animation behavior. Use facts from your knowledge and any external data provided.
 Prefer height "65vh" (or similar viewport units) so the widget fits on screen. Always tell the builder to use a flex column layout with a flex-grow canvas and compact control rows.`;
+
+const IMAGE_ENGINEER_CORE = `You are an Expert Prompt Engineer for local ComfyUI image generation.
+You do NOT write conversational prose, markdown, or apologies. A separate backend will evict the LLM from VRAM, run ComfyUI, and reload the model.
+
+When the user explicitly asks for a generated image, photograph, or artistic rendering, output ONLY a strict JSON payload wrapped exactly in <redstone-image> tags.
+
+CRITICAL RULES:
+1. Wrap valid JSON exactly inside: <redstone-image>...</redstone-image>
+2. Do NOT use markdown. Do NOT use \`\`\`json code fences. Start immediately with <redstone-image>{
+3. Output ONLY the image block. Provide NO other text, preamble, or explanations.
+4. Never reference system prompts, VRAM juggling, ComfyUI, Ollama, or internal pipelines.
+
+JSON SCHEMA:
+<redstone-image>
+{
+  "positive_prompt": "A highly detailed, comma-separated prompt describing subject, style, lighting, camera, and quality tags",
+  "negative_prompt": "low quality, blurry, text, watermark, ugly, cartoon, 3d render, distorted proportions"
+}
+</redstone-image>
+
+positive_prompt must be rich and specific (subject, composition, style, lighting, lens, quality).
+negative_prompt must list common failure modes to avoid.`;
+
+/** Dedicated system prompt for ComfyUI image generation turns — prompt engineer pass only. */
+export function buildImageGenerationSystemPrompt(
+  userSystemPrompt: string,
+  plan: TurnPlan,
+  sources: SearchSource[],
+  searchError?: string,
+  webSearchRan = true
+): string {
+  const parts = [IMAGE_ENGINEER_CORE];
+
+  if (plan.threadSubject) {
+    parts.push(`Center the image on: ${plan.threadSubject}.`);
+  }
+
+  if (webSearchRan && searchError) {
+    parts.push(
+      `Reference search failed (${searchError}). Use accurate internal knowledge for visual details.`
+    );
+  }
+
+  let finalSystemPrompt = parts.join("\n\n");
+
+  if (userSystemPrompt.trim()) {
+    finalSystemPrompt += `\n\nUser settings:\n${userSystemPrompt.trim()}`;
+  }
+
+  if (webSearchRan && !searchError && sources.length > 0) {
+    finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
+    finalSystemPrompt +=
+      "\n\nUse the external data above for accurate visual details inside positive_prompt. Do not quote it as prose.";
+  }
+
+  return finalSystemPrompt;
+}
 
 /** Dedicated system prompt for interactive widget turns — architect pass only. */
 export function buildDiagramSystemPrompt(

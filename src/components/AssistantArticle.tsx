@@ -5,6 +5,7 @@ import {
   DynamicWidgetLoader,
   WidgetArchitectPending,
 } from "@/components/DynamicWidgetLoader";
+import { ImageArchitectPending, ImageLoader } from "@/components/ImageLoader";
 import { SearchImageLayout } from "@/components/SearchImageLayout";
 import { parseContentSegments } from "@/lib/widget";
 import {
@@ -25,6 +26,7 @@ interface AssistantArticleProps {
   streamComplete?: boolean;
   model?: string;
   onWidgetBuilt?: (widgetIndex: number, html: string) => void;
+  onImageBuilt?: (imageIndex: number, url: string) => void;
 }
 
 interface MarkdownArticleBodyProps {
@@ -105,11 +107,15 @@ export function AssistantArticle({
   streamComplete = true,
   model,
   onWidgetBuilt,
+  onImageBuilt,
 }: AssistantArticleProps) {
   const { layout: chosenLayout, content: rawBody } = parseImageLayout(content);
   const segments = parseContentSegments(rawBody, { streamComplete });
   const hasWidget = segments.some(
     (s) => s.type === "widget" || s.type === "widget-pending"
+  );
+  const hasGeneratedImage = segments.some(
+    (s) => s.type === "image" || s.type === "image-pending"
   );
 
   if (segments.length === 1 && segments[0].type === "markdown") {
@@ -128,6 +134,7 @@ export function AssistantArticle({
 
   let firstMarkdown = true;
   let widgetOrdinal = 0;
+  let imageOrdinal = 0;
 
   return (
     <div className="journal-article">
@@ -148,6 +155,20 @@ export function AssistantArticle({
         if (segment.type === "widget-pending") {
           return <WidgetArchitectPending key={`widget-pending-${index}`} />;
         }
+        if (segment.type === "image") {
+          const imageIndex = imageOrdinal++;
+          return (
+            <ImageLoader
+              key={`image-${imageIndex}`}
+              spec={segment.spec}
+              model={model}
+              onBuilt={(url) => onImageBuilt?.(imageIndex, url)}
+            />
+          );
+        }
+        if (segment.type === "image-pending") {
+          return <ImageArchitectPending key={`image-pending-${index}`} />;
+        }
 
         const isFirstMarkdown = firstMarkdown;
         firstMarkdown = false;
@@ -156,7 +177,9 @@ export function AssistantArticle({
           <MarkdownArticleBody
             key={`md-${index}`}
             content={segment.text}
-            images={!hasWidget && isFirstMarkdown ? images : []}
+            images={
+              !hasWidget && !hasGeneratedImage && isFirstMarkdown ? images : []
+            }
             searchSources={searchSources}
             previewTargetId={previewTargetId}
             chosenLayout={isFirstMarkdown ? chosenLayout : null}

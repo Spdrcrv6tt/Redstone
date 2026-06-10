@@ -9,6 +9,7 @@ import { SearchImagePreloader } from "@/components/SearchImages";
 import { AgentStatusLine } from "@/components/AgentStatusLine";
 import { DebugPanel } from "@/components/DebugPanel";
 import { cleanSearchResponse, plainSearchResponse } from "@/lib/search/citations";
+import { embedGeneratedImageUrl } from "@/lib/image-gen";
 import { embedWidgetHtml } from "@/lib/widget";
 import { formatFileSize } from "@/lib/files";
 import { hasWebPreview } from "@/lib/markdown-code";
@@ -52,7 +53,9 @@ export function MessageBubble({
   }, [message.id, hasSearchImages]);
 
   const hasWidgetOpen =
-    !!assistantContent && /<redstone-widget\b/i.test(assistantContent);
+    !!assistantContent &&
+    (/<redstone-widget\b/i.test(assistantContent) ||
+      /<redstone-image\b/i.test(assistantContent));
   const isPending =
     message.isStreaming || (hasSearchImages && !imageReady);
   const canRevealBody =
@@ -65,6 +68,17 @@ export function MessageBubble({
     (widgetIndex: number, html: string) => {
       if (!conversationId || !message.content) return;
       const updated = embedWidgetHtml(message.content, widgetIndex, html);
+      if (updated !== message.content) {
+        updateMessage(conversationId, message.id, { content: updated });
+      }
+    },
+    [conversationId, message.content, message.id, updateMessage]
+  );
+
+  const handleImageBuilt = useCallback(
+    (imageIndex: number, url: string) => {
+      if (!conversationId || !message.content) return;
+      const updated = embedGeneratedImageUrl(message.content, imageIndex, url);
       if (updated !== message.content) {
         updateMessage(conversationId, message.id, { content: updated });
       }
@@ -186,6 +200,7 @@ export function MessageBubble({
                     streamComplete={!message.isStreaming}
                     model={message.model}
                     onWidgetBuilt={handleWidgetBuilt}
+                    onImageBuilt={handleImageBuilt}
                   />
                   {showLivePreview && (
                     <LivePreview

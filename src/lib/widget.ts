@@ -1,9 +1,16 @@
+import { parseImageGenerationSpec } from "@/lib/image-gen";
+import type { ImageGenerationSpec } from "@/types/image-gen";
 import type { WidgetArchitectSpec } from "@/types/widget";
 
 export type ContentSegment =
   | { type: "markdown"; text: string }
   | { type: "widget"; spec: WidgetArchitectSpec }
-  | { type: "widget-pending" };
+  | { type: "widget-pending" }
+  | { type: "image"; spec: ImageGenerationSpec }
+  | { type: "image-pending" };
+
+const ASSISTANT_BLOCK_RE =
+  /<(redstone-widget|redstone-image)\s*>([\s\S]*?)<\/\1\s*>/gi;
 
 const WIDGET_OPEN_RE = /<redstone-widget\s*>/i;
 const WIDGET_CLOSE_RE = /<\/redstone-widget\s*>/i;
@@ -135,38 +142,66 @@ export function embedWidgetHtml(
   });
 }
 
-function extractClosedWidgets(content: string): {
+function pushBlockSegment(
+  segments: ContentSegment[],
+  tag: string,
+  payload: string
+) {
+  if (tag.toLowerCase() === "redstone-image") {
+    const spec = parseImageGenerationSpec(payload);
+    segments.push(spec ? { type: "image", spec } : { type: "image-pending" });
+    return;
+  }
+
+  const spec = parseWidgetArchitectSpec(payload);
+  segments.push(spec ? { type: "widget", spec } : { type: "widget-pending" });
+}
+
+function extractClosedBlocks(content: string): {
   segments: ContentSegment[];
   remainder: string;
 } {
   const segments: ContentSegment[] = [];
   let lastIndex = 0;
 
-  for (const match of content.matchAll(WIDGET_BLOCK_RE)) {
+  for (const match of content.matchAll(ASSISTANT_BLOCK_RE)) {
     const index = match.index ?? 0;
     if (index > lastIndex) {
       const text = content.slice(lastIndex, index).trim();
       if (text) segments.push({ type: "markdown", text });
     }
 
-    const spec = parseWidgetArchitectSpec(match[1] ?? "");
-    if (spec) {
-      segments.push({ type: "widget", spec });
-    } else {
-      segments.push({ type: "widget-pending" });
-    }
-
+    pushBlockSegment(segments, match[1] ?? "", match[2] ?? "");
     lastIndex = index + match[0].length;
   }
 
   return { segments, remainder: content.slice(lastIndex) };
 }
 
-function finalizeOpenWidget(
+function finalizeOpenBlock(
   remainder: string,
   streamComplete: boolean
 ): ContentSegment[] {
-  const openMatch = remainder.match(WIDGET_OPEN_RE);
+  const widgetOpen = remainder.match(WIDGET_OPEN_RE);
+  const imageOpen = remainder.match(/<redstone-image\s*>/i);
+
+  let openMatch: RegExpMatchArray | null = null;
+  let tag = "redstone-widget";
+  if (widgetOpen && imageOpen) {
+    if ((widgetOpen.index ?? 0) <= (imageOpen.index ?? 0)) {
+      openMatch = widgetOpen;
+      tag = "redstone-widget";
+    } else {
+      openMatch = imageOpen;
+      tag = "redstone-image";
+    }
+  } else if (widgetOpen) {
+    openMatch = widgetOpen;
+  } else if (imageOpen) {
+    openMatch = imageOpen;
+    tag = "redstone-image";
+  }
+
   if (!openMatch || openMatch.index === undefined) {
     const tail = remainder.trim();
     return tail ? [{ type: "markdown", text: tail }] : [];
@@ -180,10 +215,30 @@ function finalizeOpenWidget(
   const segments: ContentSegment[] = [];
   if (before) segments.push({ type: "markdown", text: before });
 
-  const closeMatch = afterOpen.match(WIDGET_CLOSE_RE);
+  const closeRe =
+    tag === "redstone-image" ? /<\/redstone-image\s*>/i : WIDGET_CLOSE_RE;
+  const closeMatch = afterOpen.match(closeRe);
   const payload = closeMatch
     ? afterOpen.slice(0, closeMatch.index).trim()
     : afterOpen;
+
+  if (tag === "redstone-image") {
+    const spec = parseImageGenerationSpec(payload);
+    if (spec) {
+      segments.push({ type: "image", spec });
+      if (closeMatch && closeMatch.index !== undefined) {
+        const tail = afterOpen
+          .slice(closeMatch.index + closeMatch[0].length)
+          .trim();
+        if (tail) segments.push({ type: "markdown", text: tail });
+      }
+      return segments;
+    }
+    if (!streamComplete) {
+      segments.push({ type: "image-pending" });
+    }
+    return segments;
+  }
 
   const spec = parseWidgetArchitectSpec(payload);
   if (spec) {
@@ -215,13 +270,13 @@ function finalizeOpenWidget(
   return segments;
 }
 
-/** Split assistant content into markdown and widget segments. */
+/** Split assistant content into markdown, widget, and image segments. */
 export function parseContentSegments(
   content: string,
   options: { streamComplete?: boolean } = {}
 ): ContentSegment[] {
-  const { segments, remainder } = extractClosedWidgets(content);
-  const tailSegments = finalizeOpenWidget(
+  const { segments, remainder } = extractClosedBlocks(content);
+  const tailSegments = finalizeOpenBlock(
     remainder,
     options.streamComplete === true
   );

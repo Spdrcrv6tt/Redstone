@@ -54,6 +54,7 @@ export interface TurnPlan {
   exhaustiveList: boolean;
   needsWebSearch: boolean;
   needsDiagram: boolean;
+  needsImageGeneration: boolean;
   searchDecision: SearchDecision;
 }
 
@@ -270,6 +271,7 @@ function inferLastFocus(prior: OllamaChatMessage[]): FocusRef | null {
 
 type Intent =
   | "interactive_diagram"
+  | "generated_image"
   | "explicit_visual"
   | "narrow_fact"
   | "person_who"
@@ -283,6 +285,28 @@ const EXPLICIT_VISUAL =
 
 const DEMANDS_INTERACTIVE_DIAGRAM =
   /(?:diagram|visualization|visualisation|interactive model|how .+ works visually|simulate|animate|visualize|visualise)/i;
+
+/** User wants ComfyUI-generated art — not Brave photo search or an interactive widget. */
+const DEMANDS_GENERATED_IMAGE =
+  /\b(?:generate|create|draw|paint|render|make|design)\b[\s\S]{0,48}\b(?:image|picture|photo|photograph|artwork|artistic\s+rendering|illustration)\b/i;
+
+export function demandsGeneratedImage(query: string): boolean {
+  const q = query.trim();
+  if (!q || demandsInteractiveDiagram(q)) return false;
+  if (DEMANDS_GENERATED_IMAGE.test(q)) return true;
+  if (/\b(?:ai[- ]?generated|generated)\s+(?:image|picture|photo)\b/i.test(q)) {
+    return true;
+  }
+  if (
+    /\b(?:image|picture|photo|photograph|artistic\s+rendering)\s+of\b/i.test(q) &&
+    /\b(?:futuristic|fantasy|sci-?fi|cyberpunk|surreal|hyperrealistic|concept\s+art)\b/i.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
 
 const WRITES_HTML_PAGE =
   /\b(write|draft|create|build)\b[\s\S]{0,48}\b(html|landing page|web page|website)\b/i;
@@ -385,6 +409,7 @@ function buildListSearchQueries(
 function classifyIntent(query: string): Intent {
   const q = query.trim();
   if (demandsInteractiveDiagram(q)) return "interactive_diagram";
+  if (demandsGeneratedImage(q)) return "generated_image";
   if (EXPLICIT_VISUAL.test(q)) return "explicit_visual";
   if (NARROW_FACT.test(q)) return "narrow_fact";
   if (PERSON_WHO.test(q)) return "person_who";
@@ -442,6 +467,14 @@ export function decideWebSearch(
     return {
       search: true,
       reason: "high-density data request",
+      confidence: "high",
+    };
+  }
+
+  if (demandsGeneratedImage(q)) {
+    return {
+      search: false,
+      reason: "local ComfyUI image generation",
       confidence: "high",
     };
   }
@@ -855,14 +888,15 @@ export function planTurn(
   }
 
   const needsDiagram = demandsInteractiveDiagram(raw);
+  const needsImageGeneration = demandsGeneratedImage(raw);
   const explicitVisualRequest =
-    intent === "explicit_visual" && !needsDiagram;
+    intent === "explicit_visual" && !needsDiagram && !needsImageGeneration;
   const searchDecision = decideWebSearch(raw, memory, intent, exhaustiveList);
 
   let answerStyle: AnswerStyle = "standard";
   if (exhaustiveList) {
     answerStyle = "exhaustive";
-  } else if (needsDiagram) {
+  } else if (needsDiagram || needsImageGeneration) {
     answerStyle = "narrative";
   } else if (NARROW_FACT.test(raw) || (PERSON_WHO.test(raw) && raw.split(/\s+/).length < 14)) {
     answerStyle = "narrow";
@@ -877,6 +911,7 @@ export function planTurn(
 
   const shouldTryImage =
     !needsDiagram &&
+    !needsImageGeneration &&
     (explicitVisualRequest ||
       intent === "person_who" ||
       intent === "object_visual");
@@ -920,6 +955,7 @@ export function planTurn(
     exhaustiveList,
     needsWebSearch: searchDecision.search,
     needsDiagram,
+    needsImageGeneration,
     searchDecision,
   };
 }
