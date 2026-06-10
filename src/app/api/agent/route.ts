@@ -14,7 +14,6 @@ import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
 import {
   imagePlanFromOrchestrator,
   runOrchestrator,
-  runWatchdogSynopsis,
   type OrchestratorPhase,
 } from "@/lib/search/orchestrator";
 import { buildAugmentedSystemPrompt } from "@/lib/search/prompt";
@@ -97,9 +96,6 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   let imageError: string | undefined;
   let searchMs: number | undefined;
   let imageMs: number | undefined;
-  let watchdogSynopsis: string | undefined;
-  let synopsisMs: number | undefined;
-
   const draftPlan = planTurn(
     conversationMessages,
     rawUserQuery,
@@ -255,33 +251,6 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 
   const visualMode = finalizeVisualMode(turnPlan, images.length);
 
-  // In aggressive mode, have the watchdog synthesize the search results into
-  // a clean briefing before the main model sees them.
-  if (
-    searchMode === "aggressive" &&
-    routerModel &&
-    runWebSearch &&
-    sources.length > 0 &&
-    !searchError
-  ) {
-    emitStatus("Synthesizing results…", "orchestrate");
-    const synResult = await runWatchdogSynopsis(
-      host,
-      apiKey,
-      routerModel,
-      rawUserQuery,
-      sources
-    );
-    if (synResult.synopsis) {
-      watchdogSynopsis = synResult.synopsis;
-    }
-    synopsisMs = synResult.synopsisMs;
-    if (orchestratorMeta) {
-      orchestratorMeta.synopsis = synResult.synopsis || undefined;
-      orchestratorMeta.synopsisError = synResult.error;
-    }
-  }
-
   emitStatus("Generating response…", "generate");
 
   const systemContent = buildAugmentedSystemPrompt(
@@ -290,8 +259,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     sources,
     visualMode,
     searchError,
-    runWebSearch,
-    watchdogSynopsis
+    runWebSearch
   );
 
   const upstreamMessages: OllamaChatMessage[] = [
@@ -320,7 +288,6 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
             upstreamMessages,
             ...(searchMs !== undefined ? { searchMs } : {}),
             ...(imageMs !== undefined ? { imageMs } : {}),
-            ...(synopsisMs !== undefined ? { synopsisMs } : {}),
           },
         }
       : {}),

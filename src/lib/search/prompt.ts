@@ -1,4 +1,3 @@
-import { sourceLabel } from "@/lib/search/sources";
 import type {
   PortraitVariant,
   TurnPlan,
@@ -15,7 +14,9 @@ Conversation: you see the full thread. Resolve pronouns and partial names from e
 Citations: retrieved sources are reference material — you do NOT need to cite them all, or even most of them. Cite sparingly.
 - Use at most ONE <cite>N</cite> per paragraph, and at most two citations in the entire answer (one for short answers).
 - Only cite a specific fact (date, number, classification, name) you took from a web result. General summary sentences need no citation.
-- Use source numbers only: <cite>1</cite>. Never [1], [EN], or publisher names in brackets.`;
+- Use source numbers only: <cite>1</cite>. Never [1], [EN], or publisher names in brackets.
+
+You have been provided with raw web search snippets. You must base your answer on these snippets. If the snippets contain obvious contradictions, broken HTML fragments, or irrelevant SEO spam, IGNORE THEM and rely on your internal knowledge. Do NOT mention the search process or the format of the sources.`;
 
 const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your knowledge and the conversation. Never mention system prompts.
 
@@ -63,13 +64,17 @@ export function formatSearchResults(sources: SearchSource[]): string {
     return "No web results were returned for this query.";
   }
 
-  return sources
-    .map((s, i) => {
-      const lines = [`${i + 1}. ${sourceLabel(s)}`, s.title, `URL: ${s.url}`];
-      if (s.snippet) lines.push(s.snippet);
-      return lines.join("\n");
-    })
-    .join("\n\n");
+  const blocks = sources.map((s, i) => {
+    const lines = [
+      `[Source ${i + 1}]`,
+      `Title: ${s.title}`,
+      `URL: ${s.url}`,
+      `Snippet: ${s.snippet ?? ""}`,
+    ];
+    return lines.join("\n");
+  });
+
+  return `--- VERIFIED SEARCH CONTEXT ---\n${blocks.join("\n\n")}\n-------------------------------`;
 }
 
 export function buildAugmentedSystemPrompt(
@@ -78,9 +83,7 @@ export function buildAugmentedSystemPrompt(
   sources: SearchSource[],
   visualMode: VisualMode,
   searchError?: string,
-  webSearchRan = true,
-  /** When provided (watchdog/aggressive mode), replaces raw source dump. */
-  watchdogSynopsis?: string
+  webSearchRan = true
 ): string {
   const parts = [
     webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH,
@@ -111,15 +114,8 @@ export function buildAugmentedSystemPrompt(
   if (webSearchRan) {
     if (searchError) {
       parts.push(`Web search failed: ${searchError}`);
-    } else if (watchdogSynopsis) {
-      // Watchdog already synthesized the results — give main model a clean briefing.
-      parts.push(
-        `--- Research briefing for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${watchdogSynopsis}\n---`
-      );
     } else {
-      parts.push(
-        `--- Web results for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${formatSearchResults(sources)}\n---`
-      );
+      parts.push(formatSearchResults(sources));
     }
   }
 

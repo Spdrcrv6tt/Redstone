@@ -79,9 +79,6 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
               debug?.imageMs !== undefined
                 ? `Image time: ${debug.imageMs}ms`
                 : null,
-              debug?.synopsisMs !== undefined
-                ? `Synopsis time: ${debug.synopsisMs}ms`
-                : null,
               search?.query ? `Query: ${search.query}` : null,
               decision.orchestrator
                 ? [
@@ -92,12 +89,6 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
                     `Watchdog image: ${decision.orchestrator.imageSearch}`,
                     decision.orchestrator.imageQuery
                       ? `Watchdog image query: ${decision.orchestrator.imageQuery}`
-                      : null,
-                    decision.orchestrator.synopsis
-                      ? `Watchdog synopsis: ✓ (${decision.orchestrator.synopsis.length} chars)`
-                      : null,
-                    decision.orchestrator.synopsisError
-                      ? `Synopsis error: ${decision.orchestrator.synopsisError}`
                       : null,
                   ]
                     .filter(Boolean)
@@ -115,12 +106,6 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
       {decision?.orchestrator?.watchdogRaw && (
         <Section title="Watchdog decision (raw JSON)">
           <MonoBlock text={decision.orchestrator.watchdogRaw} />
-        </Section>
-      )}
-
-      {decision?.orchestrator?.synopsis && (
-        <Section title="Watchdog briefing (sent to model)" defaultOpen>
-          <MonoBlock text={decision.orchestrator.synopsis} />
         </Section>
       )}
 
