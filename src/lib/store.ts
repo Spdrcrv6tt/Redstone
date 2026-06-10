@@ -4,8 +4,19 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { EMPTY_CANVAS } from "@/lib/canvas/defaults";
 import { applyCanvasPatches } from "@/lib/canvas/patches";
-import type { Conversation, Message, AppSettings, OllamaModel } from "@/types";
-import type { CanvasDocument, CanvasPatch, EngineMode, Theme } from "@/types";
+import type {
+  Conversation,
+  Message,
+  AppSettings,
+  OllamaModel,
+  Theme,
+} from "@/types";
+import type {
+  CanvasCardData,
+  CanvasDocument,
+  CanvasPatch,
+  EngineMode,
+} from "@/types/canvas";
 import { generateId } from "@/lib/utils";
 import { generateTitle } from "@/lib/ollama";
 
@@ -54,6 +65,11 @@ interface AppState {
   getCanvas: (conversationId: string) => CanvasDocument;
   setCanvasDocument: (conversationId: string, canvas: CanvasDocument) => void;
   applyCanvasPatches: (conversationId: string, patches: CanvasPatch[]) => void;
+  updateCanvasNodeData: (
+    conversationId: string,
+    nodeId: string,
+    data: Partial<CanvasCardData>
+  ) => void;
 }
 
 export const PREFERRED_DEFAULT_MODEL = "gemma4:12b";
@@ -218,6 +234,30 @@ export const useAppStore = create<AppState>()(
             if (c.id !== conversationId) return c;
             const canvas = applyCanvasPatches(c.canvas ?? EMPTY_CANVAS, patches);
             return { ...c, canvas, updatedAt: Date.now() };
+          }),
+        }));
+      },
+
+      updateCanvasNodeData: (conversationId, nodeId, data) => {
+        set((s) => ({
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            const canvas = c.canvas ?? EMPTY_CANVAS;
+            const patchNode = (nodes: typeof canvas.nodes) =>
+              nodes.map((n) =>
+                n.id === nodeId
+                  ? { ...n, data: { ...n.data, ...data } }
+                  : n
+              );
+            return {
+              ...c,
+              canvas: {
+                ...canvas,
+                nodes: patchNode(canvas.nodes),
+                draftNodes: patchNode(canvas.draftNodes),
+              },
+              updatedAt: Date.now(),
+            };
           }),
         }));
       },

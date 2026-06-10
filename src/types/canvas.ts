@@ -7,9 +7,21 @@ export type CanvasCardKind =
   | "image"
   | "markdown"
   | "flowchart"
-  | "script";
+  | "script"
+  | "widget";
 
 export type CanvasLayer = "main" | "draft";
+
+/** Data channel binding between connected widget cards. */
+export interface CanvasWidgetBinding {
+  channel: string;
+  sourceKey?: string;
+  targetKey?: string;
+}
+
+export interface CanvasEdgeData extends Record<string, unknown> {
+  bind?: CanvasWidgetBinding;
+}
 
 export interface CanvasCardData extends Record<string, unknown> {
   kind: CanvasCardKind;
@@ -18,10 +30,15 @@ export interface CanvasCardData extends Record<string, unknown> {
   imageUrl?: string;
   markdown?: string;
   layer: CanvasLayer;
+  /** Natural-language spec for the widget HTML builder. */
+  widgetSpec?: string;
+  /** Cached builder HTML — persisted on the node. */
+  widgetHtml?: string;
+  widgetHeight?: string;
 }
 
 export type CanvasNode = Node<CanvasCardData>;
-export type CanvasEdge = Edge;
+export type CanvasEdge = Edge<CanvasEdgeData>;
 
 export interface CanvasDocument {
   nodes: CanvasNode[];
@@ -52,12 +69,15 @@ export interface CanvasViewportContext {
     body?: string;
     imageUrl?: string;
     markdown?: string;
+    widgetSpec?: string;
+    hasWidgetHtml?: boolean;
   }>;
   edges: Array<{
     id: string;
     source: string;
     target: string;
     label?: string;
+    bind?: CanvasWidgetBinding;
   }>;
   layout?: {
     cardWidth: number;
@@ -84,6 +104,8 @@ export type CanvasPatch =
       title?: string;
       body?: string;
       markdown?: string;
+      widgetSpec?: string;
+      widgetHeight?: string;
     }
   | {
       op: "update_node";
@@ -94,6 +116,9 @@ export type CanvasPatch =
       body?: string;
       markdown?: string;
       imageUrl?: string;
+      widgetSpec?: string;
+      widgetHtml?: string;
+      widgetHeight?: string;
     }
   | { op: "delete_node"; id: string }
   | {
@@ -103,6 +128,7 @@ export type CanvasPatch =
       target: string;
       label?: string;
       layer?: CanvasLayer;
+      bind?: CanvasWidgetBinding;
     }
   | {
       op: "place_image";
@@ -110,6 +136,15 @@ export type CanvasPatch =
       position: { x: number; y: number };
       imageUrl: string;
       title?: string;
+      layer?: CanvasLayer;
+    }
+  | {
+      op: "place_widget";
+      id: string;
+      position: { x: number; y: number };
+      spec: string;
+      title?: string;
+      height?: string;
       layer?: CanvasLayer;
     }
   | { op: "commit_draft" }

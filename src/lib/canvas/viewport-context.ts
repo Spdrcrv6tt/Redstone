@@ -82,6 +82,8 @@ export function buildViewportContext(
         body: n.data.body,
         imageUrl: n.data.imageUrl,
         markdown: n.data.markdown,
+        widgetSpec: n.data.widgetSpec,
+        hasWidgetHtml: !!n.data.widgetHtml,
       };
     });
 
@@ -92,6 +94,7 @@ export function buildViewportContext(
       source: e.source,
       target: e.target,
       label: typeof e.label === "string" ? e.label : undefined,
+      bind: e.data?.bind,
     }));
 
   const suggestedNext = suggestNextPosition(bounds, allOccupied);

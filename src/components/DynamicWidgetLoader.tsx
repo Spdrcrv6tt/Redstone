@@ -10,6 +10,10 @@ interface DynamicWidgetLoaderProps {
   model?: string;
   cachedHtml?: string;
   onBuilt?: (html: string) => void;
+  /** Canvas card node id — enables inter-widget messaging bridge. */
+  nodeId?: string;
+  variant?: "chat" | "canvas";
+  onIframeReady?: (win: Window) => void;
 }
 
 export function DynamicWidgetLoader({
@@ -18,17 +22,23 @@ export function DynamicWidgetLoader({
   model: modelProp,
   cachedHtml,
   onBuilt,
+  nodeId,
+  variant = "chat",
+  onIframeReady,
 }: DynamicWidgetLoaderProps) {
   const settings = useAppStore((s) => s.settings);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const onBuiltRef = useRef(onBuilt);
+  const onIframeReadyRef = useRef(onIframeReady);
   onBuiltRef.current = onBuilt;
+  onIframeReadyRef.current = onIframeReady;
   const [html, setHtml] = useState<string | null>(cachedHtml ?? null);
   const [loading, setLoading] = useState(!cachedHtml);
   const [error, setError] = useState<string | null>(null);
   const [iframeHeight, setIframeHeight] = useState(height);
 
   const model = modelProp ?? settings.defaultModel;
+  const isCanvas = variant === "canvas";
 
   useEffect(() => {
     if (cachedHtml) {
@@ -84,8 +94,14 @@ export function DynamicWidgetLoader({
   }, [cachedHtml, spec, model, settings.ollamaHost, settings.apiKey]);
 
   const srcDoc = useMemo(
-    () => (html ? normalizeDiagramHtml(html, { widgetViewport: true }) : ""),
-    [html]
+    () =>
+      html
+        ? normalizeDiagramHtml(html, {
+            widgetViewport: true,
+            canvasNodeId: nodeId,
+          })
+        : "",
+    [html, nodeId]
   );
 
   const resolveHeightPx = useCallback((h: string) => {
@@ -99,11 +115,12 @@ export function DynamicWidgetLoader({
   const clampHeight = useCallback(
     (value: number) => {
       const target = resolveHeightPx(height);
+      if (isCanvas) return Math.min(target, Math.max(200, value));
       const maxOnScreen =
         typeof window !== "undefined" ? window.innerHeight * 0.85 : target;
       return Math.min(maxOnScreen, target, Math.max(240, value));
     },
-    [height, resolveHeightPx]
+    [height, isCanvas, resolveHeightPx]
   );
 
   useEffect(() => {
@@ -122,11 +139,20 @@ export function DynamicWidgetLoader({
     return () => window.removeEventListener("message", onMessage);
   }, [clampHeight]);
 
+  const handleIframeLoad = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (win) onIframeReadyRef.current?.(win);
+  }, []);
+
   if (loading) {
     return (
       <div
-        style={{ height, background: "#1a1d26" }}
-        className="diagram-card my-4 animate-pulse flex items-center justify-center rounded-xl border border-theme text-muted text-sm"
+        style={{ height: isCanvas ? height : height, background: "#1a1d26" }}
+        className={
+          isCanvas
+            ? "canvas-widget-loader canvas-widget-loader--loading"
+            : "diagram-card my-4 animate-pulse flex items-center justify-center rounded-xl border border-theme text-muted text-sm"
+        }
       >
         Building interactive widget…
       </div>
@@ -137,10 +163,29 @@ export function DynamicWidgetLoader({
     return (
       <div
         style={{ minHeight: height, background: "#1a1d26" }}
-        className="diagram-card my-4 flex items-center justify-center rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400"
+        className={
+          isCanvas
+            ? "canvas-widget-loader canvas-widget-loader--error"
+            : "diagram-card my-4 flex items-center justify-center rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400"
+        }
       >
         {error}
       </div>
+    );
+  }
+
+  if (isCanvas) {
+    return (
+      <iframe
+        ref={iframeRef}
+        title={spec.slice(0, 80) || "Interactive widget"}
+        srcDoc={srcDoc}
+        sandbox="allow-scripts allow-same-origin"
+        onLoad={handleIframeLoad}
+        className="canvas-widget-iframe"
+        style={{ height: iframeHeight }}
+        loading="lazy"
+      />
     );
   }
 
@@ -151,6 +196,7 @@ export function DynamicWidgetLoader({
         title="Interactive widget"
         srcDoc={srcDoc}
         sandbox="allow-scripts allow-same-origin"
+        onLoad={handleIframeLoad}
         style={{
           width: "100%",
           height: iframeHeight,

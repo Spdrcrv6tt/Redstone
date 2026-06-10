@@ -176,6 +176,7 @@ export function InputComposer({
           className={[
             "relative rounded-[28px] composer-surface transition-all duration-300",
             isThinking ? "composer-surface--thinking" : "",
+            isThinking && layout === "canvas" ? "composer-surface--thinking-canvas" : "",
             dragOver ? "ring-2 ring-indigo-300/60" : "",
             blocked && !loading ? "opacity-60" : "",
           ].join(" ")}

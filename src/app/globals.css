@@ -639,6 +639,35 @@
   }
 }
 
+.composer-surface--thinking-canvas {
+  border-width: 2px;
+  animation: composer-canvas-thinking 1.1s ease-in-out infinite;
+}
+
+@keyframes composer-canvas-thinking {
+  0%, 100% {
+    border-color: #ff0033;
+    box-shadow:
+      0 0 0 1px rgba(255, 0, 51, 0.35),
+      0 0 20px rgba(255, 0, 51, 0.28),
+      0 0 40px rgba(255, 0, 51, 0.12);
+  }
+  33% {
+    border-color: #00e636;
+    box-shadow:
+      0 0 0 1px rgba(0, 230, 54, 0.35),
+      0 0 22px rgba(0, 230, 54, 0.32),
+      0 0 44px rgba(0, 230, 54, 0.14);
+  }
+  66% {
+    border-color: #1a7fff;
+    box-shadow:
+      0 0 0 1px rgba(26, 127, 255, 0.35),
+      0 0 22px rgba(26, 127, 255, 0.32),
+      0 0 44px rgba(26, 127, 255, 0.14);
+  }
+}
+
 .btn-send {
   background: var(--btn-send);
   color: var(--btn-send-text);
@@ -1215,7 +1244,8 @@ button.source-cite {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-status-dot--work {
+  .agent-status-dot--work,
+  .composer-surface--thinking-canvas {
     animation: none !important;
   }
 }
@@ -1873,4 +1903,42 @@ button.source-cite {
   height: 8px !important;
   background: var(--accent) !important;
   border: 2px solid var(--surface) !important;
+}
+
+.canvas-card--widget {
+  min-width: 300px;
+  max-width: 340px;
+  padding: 0.5rem 0.625rem 0.625rem;
+}
+
+.canvas-widget-iframe {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  border: none;
+  border-radius: 10px;
+  background: #0f1117;
+}
+
+.canvas-widget-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.canvas-widget-loader--loading {
+  background: #1a1d26;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.canvas-widget-loader--error {
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.25);
 }

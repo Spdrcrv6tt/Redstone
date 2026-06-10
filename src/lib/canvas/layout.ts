@@ -6,6 +6,8 @@ import type {
 } from "@/types/canvas";
 
 export const CARD_WIDTH = 280;
+export const WIDGET_CARD_WIDTH = 300;
+export const WIDGET_CARD_HEIGHT = 300;
 export const CARD_MIN_HEIGHT = 120;
 export const CARD_MAX_HEIGHT = 520;
 export const LAYOUT_GAP = 48;
@@ -41,6 +43,9 @@ export function estimateNodeSize(node: {
     (node.data.markdown?.length ?? 0);
 
   let height = CARD_MIN_HEIGHT;
+  if (node.data.kind === "widget") {
+    return { width: WIDGET_CARD_WIDTH, height: WIDGET_CARD_HEIGHT };
+  }
   if (node.data.kind === "image") height = 240;
   else if (node.data.markdown) height = CARD_MIN_HEIGHT + Math.min(chars / 2.5, 360);
   else height = CARD_MIN_HEIGHT + Math.min(chars / 3, 200);
@@ -56,7 +61,11 @@ export function estimatePatchSize(patch: {
   title?: string;
   body?: string;
   markdown?: string;
+  spec?: string;
 }): { width: number; height: number } {
+  if (patch.kind === "widget" || patch.spec) {
+    return { width: WIDGET_CARD_WIDTH, height: WIDGET_CARD_HEIGHT };
+  }
   if (patch.kind === "image") {
     return { width: CARD_WIDTH, height: 240 };
   }
@@ -180,12 +189,19 @@ export function suggestNextPosition(
 type PositionedPatch =
   | Extract<CanvasPatch, { op: "create_node" }>
   | Extract<CanvasPatch, { op: "place_image" }>
+  | Extract<CanvasPatch, { op: "place_widget" }>
   | (Extract<CanvasPatch, { op: "update_node" }> & {
       position: { x: number; y: number };
     });
 
 function asPositionedPatch(patch: CanvasPatch): PositionedPatch | null {
-  if (patch.op === "create_node" || patch.op === "place_image") return patch;
+  if (
+    patch.op === "create_node" ||
+    patch.op === "place_image" ||
+    patch.op === "place_widget"
+  ) {
+    return patch;
+  }
   if (patch.op === "update_node" && patch.position) {
     return { ...patch, position: patch.position };
   }
@@ -212,7 +228,9 @@ export function resolvePatchLayout(
         ? estimatePatchSize(positioned)
         : positioned.op === "place_image"
           ? estimatePatchSize({ kind: "image", title: positioned.title })
-          : (() => {
+          : positioned.op === "place_widget"
+            ? estimatePatchSize({ kind: "widget" })
+            : (() => {
               const existing = [...doc.nodes, ...doc.draftNodes].find(
                 (n) => n.id === positioned.id
               );

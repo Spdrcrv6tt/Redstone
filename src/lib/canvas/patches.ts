@@ -59,6 +59,12 @@ export function applyCanvasPatch(
           title: patch.title,
           body: patch.body,
           markdown: patch.markdown,
+          ...(patch.kind === "widget" || patch.widgetSpec
+            ? {
+                widgetSpec: patch.widgetSpec,
+                widgetHeight: patch.widgetHeight ?? "280px",
+              }
+            : {}),
         },
       };
       if (layer === "draft") {
@@ -85,6 +91,15 @@ export function applyCanvasPatch(
             ...(patch.body !== undefined ? { body: patch.body } : {}),
             ...(patch.markdown !== undefined ? { markdown: patch.markdown } : {}),
             ...(patch.imageUrl !== undefined ? { imageUrl: patch.imageUrl } : {}),
+            ...(patch.widgetSpec !== undefined
+              ? { widgetSpec: patch.widgetSpec }
+              : {}),
+            ...(patch.widgetHtml !== undefined
+              ? { widgetHtml: patch.widgetHtml }
+              : {}),
+            ...(patch.widgetHeight !== undefined
+              ? { widgetHeight: patch.widgetHeight }
+              : {}),
           },
         };
         if (layer === "draft") {
@@ -105,18 +120,44 @@ export function applyCanvasPatch(
     }
     case "draw_arrow": {
       const layer = patch.layer ?? "main";
+      const hasBind = !!patch.bind;
       const edge = {
         id: patch.id,
         source: patch.source,
         target: patch.target,
-        label: patch.label,
+        label: patch.label ?? patch.bind?.channel,
         type: "smoothstep" as const,
-        animated: layer === "draft",
+        animated: hasBind || layer === "draft",
+        data: patch.bind ? { bind: patch.bind } : undefined,
+        style: hasBind
+          ? { stroke: "#22d3ee", strokeWidth: 2 }
+          : undefined,
       };
       if (layer === "draft") {
         next.draftEdges = [...next.draftEdges.filter((e) => e.id !== patch.id), edge];
       } else {
         next.edges = [...next.edges.filter((e) => e.id !== patch.id), edge];
+      }
+      break;
+    }
+    case "place_widget": {
+      const layer = patch.layer ?? "main";
+      const node: CanvasNode = {
+        id: patch.id,
+        type: "canvasCard",
+        position: patch.position,
+        data: {
+          kind: "widget",
+          layer,
+          title: patch.title,
+          widgetSpec: patch.spec,
+          widgetHeight: patch.height ?? "280px",
+        },
+      };
+      if (layer === "draft") {
+        next.draftNodes = upsertNode(next.draftNodes, node);
+      } else {
+        next.nodes = upsertNode(next.nodes, node);
       }
       break;
     }

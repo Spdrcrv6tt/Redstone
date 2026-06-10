@@ -1,3 +1,5 @@
+import { buildCanvasWidgetBridgeScript } from "@/lib/canvas/widget-bridge";
+
 export type DiagramSegment =
   | { type: "markdown"; text: string }
   | { type: "diagram"; payload: string }
@@ -142,7 +144,7 @@ body{display:flex;flex-direction:column;min-height:100vh;max-height:100vh;}
 /** Wrap fragment HTML in a minimal document and report height to the parent frame. */
 export function normalizeDiagramHtml(
   html: string,
-  options?: { widgetViewport?: boolean }
+  options?: { widgetViewport?: boolean; canvasNodeId?: string }
 ): string {
   const trimmed = html.trim();
   if (!trimmed) {
@@ -150,6 +152,9 @@ export function normalizeDiagramHtml(
   }
 
   const widgetViewport = options?.widgetViewport === true;
+  const bridgeScript = options?.canvasNodeId
+    ? buildCanvasWidgetBridgeScript(options.canvasNodeId)
+    : "";
   const resizeScript = `<script>
 (function () {
   function report() {
@@ -181,9 +186,9 @@ export function normalizeDiagramHtml(
       }
     }
     if (/<\/body>/i.test(doc)) {
-      return doc.replace(/<\/body>/i, `${resizeScript}</body>`);
+      return doc.replace(/<\/body>/i, `${bridgeScript}${resizeScript}</body>`);
     }
-    return `${doc}${resizeScript}`;
+    return `${doc}${bridgeScript}${resizeScript}`;
   }
 
   const baseStyle = widgetViewport
@@ -199,6 +204,7 @@ export function normalizeDiagramHtml(
 </head>
 <body>
 ${trimmed}
+${bridgeScript}
 ${resizeScript}
 </body>
 </html>`;

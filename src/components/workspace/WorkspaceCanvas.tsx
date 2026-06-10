@@ -20,6 +20,8 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { CanvasWidgetBridge } from "@/components/workspace/CanvasWidgetBridge";
+import { CanvasWorkspaceContext } from "@/components/workspace/CanvasWorkspaceContext";
 import { CanvasCardNode } from "@/components/workspace/nodes/CanvasCardNode";
 import { EMPTY_CANVAS } from "@/lib/canvas/defaults";
 import { MAX_FILES, processFile } from "@/lib/files";
@@ -222,39 +224,47 @@ function WorkspaceCanvasInner({
         </div>
       ) : null}
 
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onMove={onMove}
-        onInit={(instance) => {
-          flowRef.current = instance;
-        }}
-        defaultViewport={doc.viewport}
-        fitView={nodes.length === 0}
-        minZoom={0.15}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-        className="workspace-flow"
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1}
-          className="workspace-flow-bg"
-        />
-        <Controls className="workspace-flow-controls" showInteractive={false} />
-        <MiniMap
-          className="workspace-flow-minimap"
-          pannable
-          zoomable
-          nodeColor={(n) =>
-            (n.data as CanvasCardData).layer === "draft" ? "#a78bfa" : "#6366f1"
-          }
-        />
-      </ReactFlow>
+      <CanvasWorkspaceContext.Provider value={{ conversationId }}>
+        <CanvasWidgetBridge conversationId={conversationId}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onMove={onMove}
+            onInit={(instance) => {
+              flowRef.current = instance;
+            }}
+            defaultViewport={doc.viewport}
+            fitView={nodes.length === 0}
+            minZoom={0.15}
+            maxZoom={2}
+            proOptions={{ hideAttribution: true }}
+            className="workspace-flow"
+          >
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              className="workspace-flow-bg"
+            />
+            <Controls className="workspace-flow-controls" showInteractive={false} />
+            <MiniMap
+              className="workspace-flow-minimap"
+              pannable
+              zoomable
+              nodeColor={(n) =>
+                (n.data as CanvasCardData).layer === "draft"
+                  ? "#a78bfa"
+                  : (n.data as CanvasCardData).kind === "widget"
+                    ? "#22d3ee"
+                    : "#6366f1"
+              }
+            />
+          </ReactFlow>
+        </CanvasWidgetBridge>
+      </CanvasWorkspaceContext.Provider>
     </div>
   );
 }
