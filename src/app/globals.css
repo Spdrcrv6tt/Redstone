@@ -1008,15 +1008,36 @@ button.source-cite {
 .agent-status-dots {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: center;
   flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.25rem;
 }
+
+.agent-status-dots[data-phase="work"] {
+  width: 1.375rem;
+  height: 1.375rem;
+  transition: width 0.5s ease, height 0.5s ease;
+}
+
+.agent-status-orbit-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+}
+
 .agent-status-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   width: 0.4rem;
   height: 0.4rem;
+  margin: -0.2rem 0 0 -0.2rem;
   border-radius: 999px;
   background: var(--text-muted);
-  animation: dot-pulse 1.4s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 .agent-status-text {
   font-size: 0.8125rem;

@@ -221,8 +221,8 @@ export function MessageBubble({
                   key="loading"
                   className="py-2"
                   initial={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                  exit={{ opacity: 0, y: -3, filter: "blur(2px)" }}
+                  transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
                 >
                   <AgentStatusLine
                     message={message.agentStatus?.message ?? "Thinking…"}
