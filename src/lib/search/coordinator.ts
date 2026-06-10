@@ -55,6 +55,10 @@ export interface TurnPlan {
   needsWebSearch: boolean;
   needsDiagram: boolean;
   needsImageGeneration: boolean;
+  /** User explicitly reset intent (e.g. "new topic:", "forget that"). */
+  intentReset: boolean;
+  /** New query is semantically unrelated to the prior thread subject. */
+  topicSwitch: boolean;
   searchDecision: SearchDecision;
 }
 
@@ -555,6 +559,191 @@ export function decideWebSearch(
   };
 }
 
+/* ─── Intent reset & topic similarity ───────────────────────────────────── */
+
+/** Force a clean query with no historical concatenation. */
+export const RESET_TRIGGERS =
+  /\b(?:forget\s+(?:that|about|the|this)|new\s+topic|(?:let'?s\s+)?switch\s+to|actually,?\s+(?:let'?s\s+)?(?:switch\s+to|talk\s+about|discuss))\b/i;
+
+const TOPIC_STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "that",
+  "this",
+  "with",
+  "from",
+  "about",
+  "what",
+  "when",
+  "where",
+  "which",
+  "have",
+  "been",
+  "were",
+  "they",
+  "their",
+  "there",
+  "would",
+  "could",
+  "should",
+  "tell",
+  "explain",
+  "describe",
+]);
+
+/** Jaccard threshold — below this, treat the turn as a topic switch. */
+const TOPIC_SWITCH_THRESHOLD = 0.15;
+
+export function detectIntentReset(userInput: string): boolean {
+  return RESET_TRIGGERS.test(userInput.trim());
+}
+
+/** Strip reset preamble so search and the model see only the new subject. */
+export function stripIntentResetPrefix(userInput: string): string {
+  const trimmed = userInput.trim();
+  const stripped = trimmed
+    .replace(
+      /^(?:forget\s+(?:that|about|the|this)[,.\s]+|new\s+topic\s*[:,-]?\s*|actually,?\s+(?:let'?s\s+)?(?:switch\s+to|talk\s+about|discuss)\s+|(?:let'?s\s+)?switch\s+to\s+)/i,
+      ""
+    )
+    .trim();
+  return stripped || trimmed;
+}
+
+export function getTopicFromHistory(
+  memory: ConversationMemory
+): string | null {
+  return (
+    memory.lastFocus?.label ??
+    memory.people[0] ??
+    memory.missions[0] ??
+    memory.objects[0] ??
+    null
+  );
+}
+
+function significantTokens(text: string): Set<string> {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !TOPIC_STOP_WORDS.has(w));
+
+  for (const person of extractPeople(text)) {
+    for (const part of person.toLowerCase().split(/\s+/)) {
+      if (part.length >= 3) tokens.push(part);
+    }
+  }
+  for (const topic of extractPhysicalTopics(text)) {
+    for (const part of topic.toLowerCase().split(/\s+/)) {
+      if (part.length >= 3) tokens.push(part);
+    }
+  }
+
+  return new Set(tokens);
+}
+
+export function topicSimilarityScore(a: string, b: string): number {
+  const tokensA = significantTokens(a);
+  const tokensB = significantTokens(b);
+  if (tokensA.size === 0 || tokensB.size === 0) return 0;
+
+  let intersection = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) intersection++;
+  }
+  const union = new Set([...tokensA, ...tokensB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+/** True when the new input should not inherit the previous thread subject. */
+export function checkTopicSwitch(
+  newInput: string,
+  lastTopic: string | null
+): boolean {
+  if (!lastTopic?.trim()) return false;
+  if (detectIntentReset(newInput)) return true;
+
+  const score = topicSimilarityScore(newInput, lastTopic);
+  if (score < TOPIC_SWITCH_THRESHOLD) return true;
+
+  const anchors = [
+    ...extractPeople(newInput),
+    ...extractPhysicalTopics(newInput),
+    ...extractMissions(newInput),
+    ...extractVessels(newInput),
+  ];
+  if (anchors.length > 0) {
+    const lastLower = lastTopic.toLowerCase();
+    const unrelated = anchors.filter(
+      (anchor) => !lastLower.includes(anchor.toLowerCase().slice(0, 6))
+    );
+    if (unrelated.length === anchors.length && score < 0.25) return true;
+  }
+
+  return false;
+}
+
+function inferSubjectFromQueryOnly(raw: string): string | null {
+  const people = extractPeople(raw);
+  if (people[0]) return people[0];
+  const physical = extractPhysicalTopics(raw);
+  if (physical[0]) return physical[0];
+  const missions = extractMissions(raw);
+  if (missions[0]) return missions[0];
+  const vessels = extractVessels(raw);
+  if (vessels[0]) return vessels[0];
+  return null;
+}
+
+export interface QueryDetermination {
+  query: string;
+  intentReset: boolean;
+  topicSwitch: boolean;
+}
+
+/**
+ * Build the web search query with topic-similarity gating.
+ * Drops prior subject when the user switches topics or triggers a reset.
+ */
+export function determineWebSearchQuery(
+  newInput: string,
+  messages: OllamaChatMessage[],
+  memory: ConversationMemory
+): QueryDetermination {
+  const latest = newInput.trim();
+  if (!latest) {
+    return { query: "", intentReset: false, topicSwitch: false };
+  }
+
+  if (detectIntentReset(latest)) {
+    const clean = stripIntentResetPrefix(latest);
+    return {
+      query: clean.slice(0, 400),
+      intentReset: true,
+      topicSwitch: true,
+    };
+  }
+
+  const lastTopic = getTopicFromHistory(memory);
+  const topicSwitch = checkTopicSwitch(latest, lastTopic);
+
+  if (topicSwitch) {
+    return {
+      query: latest.slice(0, 400),
+      intentReset: false,
+      topicSwitch: true,
+    };
+  }
+
+  return {
+    query: buildWebSearchQuery(latest, memory),
+    intentReset: false,
+    topicSwitch: false,
+  };
+}
+
 /* ─── Web search query ──────────────────────────────────────────────────── */
 
 function needsWebContext(query: string): boolean {
@@ -576,6 +765,11 @@ export function buildWebSearchQuery(
 ): string {
   const latest = rawUser.trim();
   if (!latest) return "";
+
+  const lastTopic = getTopicFromHistory(memory);
+  if (checkTopicSwitch(latest, lastTopic)) {
+    return latest.slice(0, 400);
+  }
 
   if (!needsWebContext(latest)) return latest.slice(0, 400);
 
@@ -878,10 +1072,13 @@ export function planTurn(
   const intent = classifyIntent(raw);
   const exhaustiveList = isExhaustiveListQuery(raw);
 
-  let webSearchQuery = buildWebSearchQuery(raw, memory);
+  const queryPlan = determineWebSearchQuery(raw, messages, memory);
+  let webSearchQuery = queryPlan.query;
   let supplementalWebQueries: string[] = [];
+  const { intentReset, topicSwitch } = queryPlan;
+  const contextLocked = intentReset || topicSwitch;
 
-  if (exhaustiveList) {
+  if (exhaustiveList && !contextLocked) {
     const listQueries = buildListSearchQueries(memory, messages, raw);
     webSearchQuery = listQueries[0];
     supplementalWebQueries = listQueries.slice(1);
@@ -891,7 +1088,15 @@ export function planTurn(
   const needsImageGeneration = demandsGeneratedImage(raw);
   const explicitVisualRequest =
     intent === "explicit_visual" && !needsDiagram && !needsImageGeneration;
-  const searchDecision = decideWebSearch(raw, memory, intent, exhaustiveList);
+
+  let searchDecision = decideWebSearch(raw, memory, intent, exhaustiveList);
+  if (intentReset) {
+    searchDecision = {
+      search: true,
+      reason: "Intent reset detected",
+      confidence: "high",
+    };
+  }
 
   let answerStyle: AnswerStyle = "standard";
   if (exhaustiveList) {
@@ -932,16 +1137,14 @@ export function planTurn(
     }
   }
 
-  const threadSubject = exhaustiveList
-    ? (inferClassSubject(memory, messages) ??
-      memory.lastFocus?.label ??
-      memory.objects[0] ??
-      null)
-    : (memory.lastFocus?.label ??
-      memory.people[0] ??
-      memory.missions[0] ??
-      memory.objects[0] ??
-      null);
+  const threadSubject = contextLocked
+    ? inferSubjectFromQueryOnly(raw)
+    : exhaustiveList
+      ? (inferClassSubject(memory, messages) ??
+        memory.lastFocus?.label ??
+        memory.objects[0] ??
+        null)
+      : getTopicFromHistory(memory);
 
   return {
     rawUserQuery: raw,
@@ -956,6 +1159,8 @@ export function planTurn(
     needsWebSearch: searchDecision.search,
     needsDiagram,
     needsImageGeneration,
+    intentReset,
+    topicSwitch,
     searchDecision,
   };
 }

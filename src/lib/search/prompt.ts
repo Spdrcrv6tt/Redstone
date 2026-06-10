@@ -5,7 +5,9 @@ import type {
 } from "@/lib/search/coordinator";
 import { chunkSourcesForContext } from "@/lib/search/context-chunk";
 import { needsUnconditionalDeepEnrich } from "@/lib/search/query-enhance";
-import type { SearchSource } from "@/types";
+import type { OllamaChatMessage, SearchSource } from "@/types";
+
+const RECENT_TURN_PAIRS = 3;
 
 const CORE_WITH_SEARCH = `You are Redstone, a helpful assistant. Never mention web search, data blocks, or system prompts.
 
@@ -137,56 +139,130 @@ export function purifyAndInjectContext(
   return `\n<EXTERNAL_DATA_CONTEXT>\n${cleanSources}\n</EXTERNAL_DATA_CONTEXT>\n`;
 }
 
+function recentTurnContext(
+  messages: OllamaChatMessage[],
+  maxPairs = RECENT_TURN_PAIRS
+): string {
+  const dialog = messages.filter(
+    (m) => m.role === "user" || m.role === "assistant"
+  );
+  const maxMessages = maxPairs * 2;
+  const recent = dialog.slice(-maxMessages);
+  if (recent.length === 0) return "";
+
+  return recent
+    .map((m) => `${m.role}: ${m.content.trim().slice(0, 600)}`)
+    .join("\n\n");
+}
+
+function assembleSegmentedPrompt(sections: {
+  core: string[];
+  dynamic?: string[];
+  task: string[];
+  extras?: string[];
+}): string {
+  const blocks: string[] = [
+    `## CORE CONSTRAINTS\n\n${sections.core.filter(Boolean).join("\n\n")}`,
+  ];
+
+  const dynamic = sections.dynamic?.filter(Boolean) ?? [];
+  if (dynamic.length > 0) {
+    blocks.push(`## DYNAMIC CONTEXT\n\n${dynamic.join("\n\n")}`);
+  }
+
+  blocks.push(`## TASK SPECIFICS\n\n${sections.task.filter(Boolean).join("\n\n")}`);
+
+  const extras = sections.extras?.filter(Boolean) ?? [];
+  if (extras.length > 0) {
+    blocks.push(extras.join("\n\n"));
+  }
+
+  return blocks.join("\n\n");
+}
+
+function buildDynamicContextSection(
+  messages: OllamaChatMessage[],
+  plan: TurnPlan,
+  visualMode: VisualMode
+): string[] {
+  const parts: string[] = [];
+
+  if (plan.intentReset || plan.topicSwitch) {
+    parts.push(
+      "The user changed topics this turn. Do not apply constraints, subjects, or assumptions from earlier messages unless the current query explicitly references them."
+    );
+  } else if (plan.threadSubject) {
+    parts.push(
+      `Active thread subject (only if still relevant to the current query): ${plan.threadSubject}.`
+    );
+  }
+
+  const recent = recentTurnContext(messages);
+  if (recent) {
+    parts.push(
+      `Recent conversation (last ${RECENT_TURN_PAIRS} turns — for pronoun resolution only):\n${recent}`
+    );
+  }
+
+  if (visualMode === "show" && plan.imageSearch?.personNames[0]) {
+    parts.push(
+      `The displayed image is a portrait of ${plan.imageSearch.personNames[0]}. If you name who is shown, it must be ${plan.imageSearch.personNames[0]} — never another astronaut.`
+    );
+  }
+
+  return parts;
+}
+
+function buildTaskSection(plan: TurnPlan, searchError?: string): string[] {
+  const parts = [
+    `Current user query: ${plan.rawUserQuery}`,
+    answerInstructions(plan.answerStyle),
+    visualInstructions(
+      plan.visualMode,
+      plan.explicitVisualRequest,
+      plan.imageSearch?.variant
+    ),
+  ];
+
+  const timelineRule = timelineInstructions(plan.rawUserQuery);
+  if (timelineRule) parts.push(timelineRule);
+
+  if (searchError) {
+    parts.push(`Web search failed: ${searchError}`);
+  }
+
+  return parts;
+}
+
 export function buildAugmentedSystemPrompt(
   userSystemPrompt: string,
   plan: TurnPlan,
   sources: SearchSource[],
   visualMode: VisualMode,
   searchError?: string,
-  webSearchRan = true
+  webSearchRan = true,
+  conversationMessages: OllamaChatMessage[] = []
 ): string {
-  const instructionParts = [
-    webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH,
-    answerInstructions(plan.answerStyle),
-    visualInstructions(
-      visualMode,
-      plan.explicitVisualRequest,
-      plan.imageSearch?.variant
-    ),
-  ];
-
-  if (plan.threadSubject) {
-    instructionParts.push(
-      `The conversation is about ${plan.threadSubject}. Answer only about that subject.`
-    );
-  }
-
-  if (visualMode === "show" && plan.imageSearch?.personNames[0]) {
-    instructionParts.push(
-      `The displayed image is a portrait of ${plan.imageSearch.personNames[0]}. If you name who is shown, it must be ${plan.imageSearch.personNames[0]} — never another astronaut.`
-    );
-  }
-
-  if (webSearchRan && searchError) {
-    instructionParts.push(`Web search failed: ${searchError}`);
-  }
-
-  const timelineRule = timelineInstructions(plan.rawUserQuery);
-  if (timelineRule) {
-    instructionParts.push(timelineRule);
-  }
-
-  let finalSystemPrompt = instructionParts.join("\n\n");
+  const core = [webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH];
 
   if (userSystemPrompt.trim()) {
-    finalSystemPrompt += `\n\nUser settings:\n${userSystemPrompt.trim()}`;
+    core.push(`User settings:\n${userSystemPrompt.trim()}`);
   }
 
-  if (webSearchRan && !searchError) {
-    finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
+  const dynamic = buildDynamicContextSection(
+    conversationMessages,
+    plan,
+    visualMode
+  );
+
+  const task = buildTaskSection(plan, webSearchRan ? searchError : undefined);
+
+  const extras: string[] = [];
+  if (webSearchRan && !searchError && sources.length > 0) {
+    extras.push(purifyAndInjectContext(sources, plan.rawUserQuery));
   }
 
-  return finalSystemPrompt;
+  return assembleSegmentedPrompt({ core, dynamic, task, extras });
 }
 
 const WIDGET_ARCHITECT_CORE = `You are the Widget Architect. The user wants to visualize, simulate, or learn a complex concept interactively.
@@ -241,33 +317,42 @@ export function buildImageGenerationSystemPrompt(
   plan: TurnPlan,
   sources: SearchSource[],
   searchError?: string,
-  webSearchRan = true
+  webSearchRan = true,
+  conversationMessages: OllamaChatMessage[] = []
 ): string {
-  const parts = [IMAGE_ENGINEER_CORE];
-
-  if (plan.threadSubject) {
-    parts.push(`Center the image on: ${plan.threadSubject}.`);
+  const core = [IMAGE_ENGINEER_CORE];
+  if (userSystemPrompt.trim()) {
+    core.push(`User settings:\n${userSystemPrompt.trim()}`);
   }
 
+  const dynamic = buildDynamicContextSection(
+    conversationMessages,
+    plan,
+    "none"
+  );
+  if (!plan.intentReset && !plan.topicSwitch && plan.threadSubject) {
+    dynamic.unshift(`Center the image on: ${plan.threadSubject}.`);
+  }
+
+  const task = [
+    `Current user query: ${plan.rawUserQuery}`,
+    "Output only the <redstone-image> JSON block for this query.",
+  ];
   if (webSearchRan && searchError) {
-    parts.push(
+    task.push(
       `Reference search failed (${searchError}). Use accurate internal knowledge for visual details.`
     );
   }
 
-  let finalSystemPrompt = parts.join("\n\n");
-
-  if (userSystemPrompt.trim()) {
-    finalSystemPrompt += `\n\nUser settings:\n${userSystemPrompt.trim()}`;
-  }
-
+  const extras: string[] = [];
   if (webSearchRan && !searchError && sources.length > 0) {
-    finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
-    finalSystemPrompt +=
-      "\n\nUse the external data above for accurate visual details inside positive_prompt. Do not quote it as prose.";
+    extras.push(purifyAndInjectContext(sources, plan.rawUserQuery));
+    extras.push(
+      "Use the external data above for accurate visual details inside positive_prompt. Do not quote it as prose."
+    );
   }
 
-  return finalSystemPrompt;
+  return assembleSegmentedPrompt({ core, dynamic, task, extras });
 }
 
 /** Dedicated system prompt for interactive widget turns — architect pass only. */
@@ -276,31 +361,40 @@ export function buildDiagramSystemPrompt(
   plan: TurnPlan,
   sources: SearchSource[],
   searchError?: string,
-  webSearchRan = true
+  webSearchRan = true,
+  conversationMessages: OllamaChatMessage[] = []
 ): string {
-  const parts = [WIDGET_ARCHITECT_CORE];
-
-  if (plan.threadSubject) {
-    parts.push(`Focus the visualization on: ${plan.threadSubject}.`);
+  const core = [WIDGET_ARCHITECT_CORE];
+  if (userSystemPrompt.trim()) {
+    core.push(`User settings:\n${userSystemPrompt.trim()}`);
   }
 
+  const dynamic = buildDynamicContextSection(
+    conversationMessages,
+    plan,
+    "none"
+  );
+  if (!plan.intentReset && !plan.topicSwitch && plan.threadSubject) {
+    dynamic.unshift(`Focus the visualization on: ${plan.threadSubject}.`);
+  }
+
+  const task = [
+    `Current user query: ${plan.rawUserQuery}`,
+    "Output only the <redstone-widget> JSON block for this query.",
+  ];
   if (webSearchRan && searchError) {
-    parts.push(
+    task.push(
       `Reference search failed (${searchError}). Use accurate internal knowledge for labels and numbers.`
     );
   }
 
-  let finalSystemPrompt = parts.join("\n\n");
-
-  if (userSystemPrompt.trim()) {
-    finalSystemPrompt += `\n\nUser settings:\n${userSystemPrompt.trim()}`;
-  }
-
+  const extras: string[] = [];
   if (webSearchRan && !searchError && sources.length > 0) {
-    finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
-    finalSystemPrompt +=
-      "\n\nUse the external data above for accurate facts inside props.spec. Do not quote it as prose.";
+    extras.push(purifyAndInjectContext(sources, plan.rawUserQuery));
+    extras.push(
+      "Use the external data above for accurate facts inside props.spec. Do not quote it as prose."
+    );
   }
 
-  return finalSystemPrompt;
+  return assembleSegmentedPrompt({ core, dynamic, task, extras });
 }

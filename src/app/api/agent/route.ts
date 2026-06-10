@@ -246,7 +246,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
         turnPlan,
         sources,
         searchError,
-        runWebSearch
+        runWebSearch,
+        conversationMessages
       )
     : turnPlan.needsImageGeneration
       ? buildImageGenerationSystemPrompt(
@@ -254,7 +255,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
           turnPlan,
           sources,
           searchError,
-          runWebSearch
+          runWebSearch,
+          conversationMessages
         )
       : buildAugmentedSystemPrompt(
           userSystemPrompt,
@@ -262,7 +264,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
           sources,
           visualMode,
           searchError,
-          runWebSearch
+          runWebSearch,
+          conversationMessages
         );
 
   const upstreamMessages: OllamaChatMessage[] = [
