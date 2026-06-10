@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { RedstoneLogo } from "@/components/RedstoneLogo";
-import { EngineModeToggle } from "@/components/EngineModeToggle";
 
 const EXPANDED_W = 280;
 const COLLAPSED_W = 56;
@@ -141,8 +140,7 @@ function SidebarPanel({
         ))}
       </div>
 
-      <div className="px-3 py-3 border-t border-sidebar space-y-2 safe-bottom">
-        <EngineModeToggle className="w-full" />
+      <div className="px-3 py-3 border-t border-sidebar space-y-0.5 safe-bottom">
         <button
           onClick={() => setSettingsOpen(true)}
           className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-secondary hover:text-primary hover:bg-surface-hover transition-colors"

@@ -13,7 +13,6 @@ import { MessageBubble } from "@/components/MessageBubble";
 import { InputComposer } from "@/components/InputComposer";
 import { SettingsModal } from "@/components/SettingsModal";
 import { AppBootstrap } from "@/components/AppBootstrap";
-import { EngineModeToggle } from "@/components/EngineModeToggle";
 import { WorkspaceView } from "@/components/workspace/WorkspaceView";
 import type { MessageAttachment } from "@/types";
 
@@ -173,10 +172,6 @@ export default function Home() {
                   !isChat ? "landing-shell" : "",
                 ].join(" ")}
               >
-                <div className="hidden md:flex justify-center pt-3 px-4 flex-shrink-0">
-                  <EngineModeToggle />
-                </div>
-
                 {isChat ? (
                   <>
                     <motion.div

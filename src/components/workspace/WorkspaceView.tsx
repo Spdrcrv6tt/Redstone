@@ -3,7 +3,6 @@
 import { useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { InputComposer } from "@/components/InputComposer";
-import { EngineModeToggle } from "@/components/EngineModeToggle";
 import { WorkspaceCanvas } from "@/components/workspace/WorkspaceCanvas";
 import { useWorkspaceChat } from "@/hooks/useWorkspaceChat";
 import { buildViewportContext } from "@/lib/canvas/viewport-context";
@@ -66,9 +65,8 @@ export function WorkspaceView({
 
   return (
     <div className="workspace-view flex flex-col flex-1 min-h-0 min-w-0">
-      <div className="workspace-toolbar flex items-center justify-between gap-3 px-3 sm:px-5 py-2 flex-shrink-0 border-b border-theme">
-        <EngineModeToggle compact={isMobile} />
-        <p className="workspace-toolbar-hint text-xs text-muted hidden sm:block">
+      <div className="workspace-toolbar flex items-center justify-end gap-3 px-3 sm:px-5 py-2 flex-shrink-0 border-b border-theme">
+        <p className="workspace-toolbar-hint text-xs text-muted">
           Pan the canvas — the agent only sees cards in your viewport
         </p>
       </div>

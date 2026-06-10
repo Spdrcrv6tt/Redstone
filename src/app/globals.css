@@ -1740,37 +1740,13 @@ button.source-cite {
   box-shadow: none;
 }
 
-/* ─── Engine mode toggle ─────────────────────────────────────────────────── */
-.engine-mode-toggle {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  gap: 2px;
-}
-
-.engine-mode-toggle--compact .engine-mode-toggle-btn span {
-  font-size: 0.6875rem;
-}
-
-.engine-mode-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-}
-
-.engine-mode-toggle-btn--active {
-  background: var(--surface);
+.composer-attach-btn--open {
+  background: var(--surface-hover);
   color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.composer-attach-btn--canvas {
+  color: var(--accent);
 }
 
 /* ─── Workspace canvas ───────────────────────────────────────────────────── */

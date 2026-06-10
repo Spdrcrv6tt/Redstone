@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
+import { ComposerAttachMenu } from "@/components/ComposerAttachMenu";
 import { ModelPicker } from "@/components/ModelPicker";
 import { processFiles, formatFileSize, MAX_FILES } from "@/lib/files";
 import type { MessageAttachment } from "@/types";
@@ -45,9 +46,12 @@ export function InputComposer({
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const attachBtnRef = useRef<HTMLButtonElement>(null);
 
   const {
     settings,
@@ -55,6 +59,7 @@ export function InputComposer({
     activeConversationId,
     conversations,
     updateConversationModel,
+    engineMode,
   } = useAppStore();
   const loading = useAppStore((s) => s.modelsLoading);
   const error = useAppStore((s) => s.modelsError);
@@ -222,19 +227,45 @@ export function InputComposer({
           <div className="composer-input-area px-2 py-2 md:px-3 md:py-2.5">
             <div className="composer-input-row flex items-center gap-1 md:gap-1.5">
               <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isStreaming || attachments.length >= MAX_FILES}
-                title="Attach files"
-                className="composer-icon-btn composer-control-btn disabled:opacity-40"
+                ref={attachBtnRef}
+                type="button"
+                onClick={() => setAttachMenuOpen((v) => !v)}
+                disabled={isStreaming}
+                title="Attach or switch mode"
+                aria-expanded={attachMenuOpen}
+                className={[
+                  "composer-icon-btn composer-control-btn disabled:opacity-40",
+                  attachMenuOpen ? "composer-attach-btn--open" : "",
+                  engineMode === "canvas" ? "composer-attach-btn--canvas" : "",
+                ].join(" ")}
               >
                 <Plus className="w-5 h-5" strokeWidth={1.75} />
               </button>
+              <ComposerAttachMenu
+                open={attachMenuOpen}
+                onOpenChange={setAttachMenuOpen}
+                anchorRef={attachBtnRef}
+                onUploadImage={() => imageInputRef.current?.click()}
+                onTakePhoto={() => cameraInputRef.current?.click()}
+                disabled={isStreaming || attachments.length >= MAX_FILES}
+              />
               <input
-                ref={fileInputRef}
+                ref={imageInputRef}
                 type="file"
                 multiple
                 className="hidden"
-                accept="image/*,.txt,.md,.json,.csv,.xml,.html,.js,.ts,.tsx,.jsx,.py,.go,.rs,.java,.css,.yaml,.yml,.sql,.sh"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files?.length) addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                capture="environment"
                 onChange={(e) => {
                   if (e.target.files?.length) addFiles(e.target.files);
                   e.target.value = "";
