@@ -20,15 +20,21 @@
   --scrollbar: rgba(0, 0, 0, 0.12);
   --scrollbar-hover: rgba(0, 0, 0, 0.2);
 
-  --orb-1: rgba(199, 210, 254, 0.55);
-  --orb-2: rgba(186, 230, 253, 0.42);
-  --orb-3: rgba(253, 230, 200, 0.35);
-  --aurora-a: rgba(167, 139, 250, 0.18);
-  --aurora-b: rgba(125, 211, 252, 0.14);
-  --aurora-c: rgba(251, 207, 232, 0.1);
-  --gemini-sky-a: rgba(96, 165, 250, 0.55);
-  --gemini-sky-b: rgba(129, 140, 248, 0.42);
-  --gemini-sky-c: rgba(45, 212, 191, 0.28);
+  --orb-1: rgba(199, 210, 254, 0.38);
+  --orb-2: rgba(186, 230, 253, 0.3);
+  --orb-3: rgba(167, 139, 250, 0.26);
+  --orb-4: rgba(125, 211, 252, 0.22);
+  --aurora-a: rgba(167, 139, 250, 0.12);
+  --aurora-b: rgba(125, 211, 252, 0.09);
+  --aurora-c: rgba(251, 207, 232, 0.07);
+  --aurora-d: rgba(129, 140, 248, 0.08);
+  --gemini-sky-a: rgba(96, 165, 250, 0.38);
+  --gemini-sky-b: rgba(129, 140, 248, 0.28);
+  --gemini-sky-c: rgba(45, 212, 191, 0.18);
+  --gemini-sky-alt-a: rgba(129, 140, 248, 0.32);
+  --gemini-sky-alt-b: rgba(56, 189, 248, 0.22);
+  --gemini-sky-alt-c: rgba(192, 132, 252, 0.14);
+  --aurora-bloom: rgba(99, 102, 241, 0.14);
   --ray-color: rgba(255, 255, 255, 0.45);
   --vignette: radial-gradient(ellipse 90% 80% at 50% 50%, transparent 50%, rgba(240, 244, 249, 0.5) 100%);
   --composer-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.04);
@@ -82,15 +88,21 @@
   --scrollbar: rgba(255, 255, 255, 0.1);
   --scrollbar-hover: rgba(255, 255, 255, 0.18);
 
-  --orb-1: rgba(99, 102, 241, 0.22);
-  --orb-2: rgba(56, 189, 248, 0.14);
-  --orb-3: rgba(168, 85, 247, 0.12);
-  --aurora-a: rgba(99, 102, 241, 0.12);
-  --aurora-b: rgba(14, 165, 233, 0.08);
-  --aurora-c: rgba(192, 132, 252, 0.08);
-  --gemini-sky-a: rgba(59, 130, 246, 0.72);
-  --gemini-sky-b: rgba(99, 102, 241, 0.52);
-  --gemini-sky-c: rgba(45, 212, 191, 0.32);
+  --orb-1: rgba(59, 130, 246, 0.16);
+  --orb-2: rgba(99, 102, 241, 0.13);
+  --orb-3: rgba(45, 212, 191, 0.1);
+  --orb-4: rgba(129, 140, 248, 0.09);
+  --aurora-a: rgba(59, 130, 246, 0.09);
+  --aurora-b: rgba(99, 102, 241, 0.07);
+  --aurora-c: rgba(45, 212, 191, 0.06);
+  --aurora-d: rgba(168, 85, 247, 0.05);
+  --gemini-sky-a: rgba(37, 99, 235, 0.42);
+  --gemini-sky-b: rgba(79, 70, 229, 0.28);
+  --gemini-sky-c: rgba(20, 184, 166, 0.18);
+  --gemini-sky-alt-a: rgba(56, 189, 248, 0.26);
+  --gemini-sky-alt-b: rgba(124, 58, 237, 0.2);
+  --gemini-sky-alt-c: rgba(14, 165, 233, 0.12);
+  --aurora-bloom: rgba(59, 130, 246, 0.1);
   --ray-color: rgba(255, 255, 255, 0.06);
   --vignette: radial-gradient(ellipse 90% 80% at 50% 50%, transparent 40%, rgba(9, 9, 12, 0.6) 100%);
   --composer-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
@@ -140,81 +152,192 @@
 }
 
 /* ─── Ambient animations ─────────────────────────────────────────────────── */
-@keyframes breathe {
-  0%, 100% { opacity: 0.5; transform: scale(1) translate(0, 0); }
-  50%       { opacity: 0.9; transform: scale(1.06) translate(8px, -6px); }
+@keyframes orb-pulse-1 {
+  0%, 100% {
+    opacity: 0.32;
+    transform: scale(0.94) translate(0, 0);
+  }
+  28% {
+    opacity: 0.58;
+    transform: scale(1.05) translate(1.5%, -1%);
+  }
+  62% {
+    opacity: 0.42;
+    transform: scale(0.98) translate(-1%, 0.8%);
+  }
+  84% {
+    opacity: 0.52;
+    transform: scale(1.02) translate(0.5%, 0.4%);
+  }
 }
 
-@keyframes breathe-alt {
-  0%, 100% { opacity: 0.35; transform: scale(1) translate(0, 0); }
-  50%       { opacity: 0.75; transform: scale(1.08) translate(-12px, 10px); }
+@keyframes orb-pulse-2 {
+  0%, 100% {
+    opacity: 0.26;
+    transform: scale(0.96) translate(0, 0);
+  }
+  22% {
+    opacity: 0.48;
+    transform: scale(1.04) translate(-2%, 1.2%);
+  }
+  55% {
+    opacity: 0.34;
+    transform: scale(0.97) translate(1.5%, -0.6%);
+  }
+  78% {
+    opacity: 0.44;
+    transform: scale(1.03) translate(-0.8%, 0.5%);
+  }
 }
 
-@keyframes breathe-slow {
-  0%, 100% { opacity: 0.3; transform: translate(0, 0) rotate(0deg); }
-  50%       { opacity: 0.65; transform: translate(16px, -12px) rotate(3deg); }
+@keyframes orb-pulse-3 {
+  0%, 100% {
+    opacity: 0.22;
+    transform: scale(0.95) translate(0, 0);
+  }
+  35% {
+    opacity: 0.4;
+    transform: scale(1.06) translate(1%, 1%);
+  }
+  68% {
+    opacity: 0.28;
+    transform: scale(0.96) translate(-1.2%, -0.4%);
+  }
+}
+
+@keyframes orb-pulse-4 {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(0.97) translate(0, 0);
+  }
+  40% {
+    opacity: 0.36;
+    transform: scale(1.04) translate(-1%, 0.8%);
+  }
+  72% {
+    opacity: 0.24;
+    transform: scale(0.98) translate(0.8%, -0.5%);
+  }
 }
 
 @keyframes aurora-drift {
   0%, 100% {
-    background-position: 0% 40%, 100% 60%, 50% 20%;
+    background-position: 0% 35%, 100% 55%, 48% 18%, 72% 42%;
+    opacity: 0.55;
     transform: scale(1) translate(0, 0);
   }
-  20% {
-    background-position: 25% 55%, 75% 35%, 65% 15%;
-    transform: scale(1.03) translate(1%, -0.5%);
+  18% {
+    background-position: 22% 52%, 78% 38%, 62% 12%, 55% 58%;
+    opacity: 0.78;
+    transform: scale(1.03) translate(0.8%, -0.4%);
   }
-  40% {
-    background-position: 55% 30%, 30% 70%, 85% 40%;
-    transform: scale(1.05) translate(-1%, 0.5%);
+  38% {
+    background-position: 48% 28%, 32% 68%, 88% 36%, 18% 48%;
+    opacity: 0.62;
+    transform: scale(1.06) translate(-0.6%, 0.5%);
   }
-  60% {
-    background-position: 70% 65%, 15% 25%, 20% 55%;
-    transform: scale(1.02) translate(0.5%, 1%);
+  58% {
+    background-position: 68% 62%, 14% 28%, 24% 52%, 82% 22%;
+    opacity: 0.72;
+    transform: scale(1.02) translate(0.4%, 0.8%);
   }
-  80% {
-    background-position: 35% 20%, 90% 50%, 45% 75%;
-    transform: scale(1.04) translate(-0.5%, -0.5%);
+  78% {
+    background-position: 34% 18%, 88% 48%, 42% 72%, 64% 34%;
+    opacity: 0.5;
+    transform: scale(0.98) translate(-0.5%, -0.3%);
   }
 }
 
 @keyframes gemini-sky-shift {
   0%, 100% {
-    filter: hue-rotate(0deg) saturate(1);
-    opacity: 1;
+    opacity: 0.62;
+    transform: scale(1) translateY(0);
+    filter: hue-rotate(0deg) saturate(1) brightness(1);
   }
-  25% {
-    filter: hue-rotate(18deg) saturate(1.08);
-    opacity: 0.92;
+  20% {
+    opacity: 0.88;
+    transform: scale(1.04) translateY(-1.5%);
+    filter: hue-rotate(8deg) saturate(1.06) brightness(1.08);
   }
-  50% {
-    filter: hue-rotate(-12deg) saturate(0.96);
-    opacity: 1;
+  45% {
+    opacity: 0.55;
+    transform: scale(0.98) translateY(0.5%);
+    filter: hue-rotate(-6deg) saturate(0.94) brightness(0.92);
   }
-  75% {
-    filter: hue-rotate(28deg) saturate(1.05);
-    opacity: 0.94;
+  70% {
+    opacity: 0.8;
+    transform: scale(1.06) translateY(-0.8%);
+    filter: hue-rotate(14deg) saturate(1.04) brightness(1.05);
+  }
+}
+
+@keyframes gemini-sky-alt-shift {
+  0%, 100% {
+    opacity: 0.28;
+    transform: scale(1.02) translateY(0);
+    filter: hue-rotate(0deg) saturate(1) brightness(1);
+  }
+  30% {
+    opacity: 0.62;
+    transform: scale(1.08) translateY(-1%);
+    filter: hue-rotate(-10deg) saturate(1.08) brightness(1.1);
+  }
+  55% {
+    opacity: 0.38;
+    transform: scale(0.96) translateY(0.8%);
+    filter: hue-rotate(12deg) saturate(0.92) brightness(0.9);
+  }
+  82% {
+    opacity: 0.52;
+    transform: scale(1.04) translateY(-0.4%);
+    filter: hue-rotate(-4deg) saturate(1.02) brightness(1.02);
+  }
+}
+
+@keyframes sky-field-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes bloom-pulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.92) translate(0, 0);
+  }
+  33% {
+    opacity: 0.65;
+    transform: scale(1.08) translate(2%, -1%);
+  }
+  66% {
+    opacity: 0.45;
+    transform: scale(1.02) translate(-1.5%, 0.6%);
   }
 }
 
 @keyframes orb-color-1 {
   0%, 100% { background: var(--orb-1); }
-  25% { background: color-mix(in srgb, var(--orb-1) 55%, rgba(167, 139, 250, 0.55) 45%); }
-  50% { background: color-mix(in srgb, var(--orb-1) 50%, rgba(125, 211, 252, 0.45) 50%); }
-  75% { background: color-mix(in srgb, var(--orb-1) 60%, rgba(192, 132, 252, 0.4) 40%); }
+  20% { background: color-mix(in srgb, var(--orb-1) 45%, rgba(96, 165, 250, 0.5) 55%); }
+  45% { background: color-mix(in srgb, var(--orb-1) 40%, rgba(167, 139, 250, 0.45) 60%); }
+  70% { background: color-mix(in srgb, var(--orb-1) 50%, rgba(125, 211, 252, 0.4) 50%); }
 }
 
 @keyframes orb-color-2 {
   0%, 100% { background: var(--orb-2); }
-  30% { background: color-mix(in srgb, var(--orb-2) 50%, rgba(56, 189, 248, 0.5) 50%); }
-  55% { background: color-mix(in srgb, var(--orb-2) 55%, rgba(129, 140, 248, 0.45) 45%); }
-  80% { background: color-mix(in srgb, var(--orb-2) 50%, rgba(45, 212, 191, 0.4) 50%); }
+  25% { background: color-mix(in srgb, var(--orb-2) 42%, rgba(56, 189, 248, 0.48) 58%); }
+  50% { background: color-mix(in srgb, var(--orb-2) 45%, rgba(99, 102, 241, 0.42) 55%); }
+  75% { background: color-mix(in srgb, var(--orb-2) 48%, rgba(45, 212, 191, 0.38) 52%); }
 }
 
 @keyframes orb-color-3 {
   0%, 100% { background: var(--orb-3); }
-  35% { background: color-mix(in srgb, var(--orb-3) 55%, rgba(168, 85, 247, 0.45) 45%); }
-  65% { background: color-mix(in srgb, var(--orb-3) 50%, rgba(59, 130, 246, 0.4) 50%); }
+  30% { background: color-mix(in srgb, var(--orb-3) 44%, rgba(45, 212, 191, 0.42) 56%); }
+  60% { background: color-mix(in srgb, var(--orb-3) 40%, rgba(129, 140, 248, 0.4) 60%); }
+}
+
+@keyframes orb-color-4 {
+  0%, 100% { background: var(--orb-4); }
+  35% { background: color-mix(in srgb, var(--orb-4) 42%, rgba(20, 184, 166, 0.4) 58%); }
+  65% { background: color-mix(in srgb, var(--orb-4) 45%, rgba(168, 85, 247, 0.35) 55%); }
 }
 
 @keyframes ray-sweep-1 {
@@ -265,69 +388,110 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     black 0%,
-    black 42%,
-    rgba(0, 0, 0, 0.55) 62%,
-    transparent 88%
+    black 28%,
+    rgba(0, 0, 0, 0.72) 48%,
+    rgba(0, 0, 0, 0.35) 68%,
+    transparent 92%
   );
   mask-image: linear-gradient(
     to bottom,
     black 0%,
-    black 42%,
-    rgba(0, 0, 0, 0.55) 62%,
-    transparent 88%
+    black 28%,
+    rgba(0, 0, 0, 0.72) 48%,
+    rgba(0, 0, 0, 0.35) 68%,
+    transparent 92%
   );
   pointer-events: none;
 }
 
-/* Gemini-style top curtain — visible on new chat only */
+.ambient-sky-field {
+  transform-origin: 50% 0%;
+  animation: sky-field-breathe 38s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+}
+
+/* Gemini-style top curtain — mesh of soft radial washes */
 .ambient-gemini-sky {
   pointer-events: none;
   background:
-    radial-gradient(ellipse 140% 100% at 50% -20%, var(--gemini-sky-a) 0%, transparent 70%),
-    radial-gradient(ellipse 100% 80% at 8% 0%, var(--gemini-sky-b) 0%, transparent 66%),
-    radial-gradient(ellipse 90% 75% at 92% 2%, var(--gemini-sky-c) 0%, transparent 64%),
-    linear-gradient(180deg, color-mix(in srgb, var(--gemini-sky-a) 18%, transparent) 0%, transparent 72%, var(--bg-base) 100%);
+    radial-gradient(ellipse 160% 110% at 50% -28%, var(--gemini-sky-a) 0%, transparent 78%),
+    radial-gradient(ellipse 120% 90% at 6% -4%, var(--gemini-sky-b) 0%, transparent 72%),
+    radial-gradient(ellipse 110% 85% at 94% -2%, var(--gemini-sky-c) 0%, transparent 70%);
+}
+
+.ambient-gemini-sky-alt {
+  background:
+    radial-gradient(ellipse 150% 100% at 62% -22%, var(--gemini-sky-alt-a) 0%, transparent 76%),
+    radial-gradient(ellipse 100% 80% at 22% 2%, var(--gemini-sky-alt-b) 0%, transparent 74%),
+    radial-gradient(ellipse 90% 70% at 78% 4%, var(--gemini-sky-alt-c) 0%, transparent 72%);
 }
 
 .ambient-gemini-sky-animate {
-  animation: gemini-sky-shift 28s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation: gemini-sky-shift 34s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+}
+
+.ambient-gemini-sky-alt-animate {
+  animation: gemini-sky-alt-shift 41s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+  animation-delay: -14s;
+}
+
+.ambient-bloom {
+  background: radial-gradient(
+    ellipse 120% 80% at 50% -10%,
+    var(--aurora-bloom) 0%,
+    transparent 72%
+  );
+  filter: blur(28px);
+}
+
+.ambient-bloom-animate {
+  animation: bloom-pulse 29s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+  animation-delay: -8s;
 }
 
 .ambient-aurora {
   background:
-    radial-gradient(ellipse 60% 50% at 20% 40%, var(--aurora-a) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at 80% 60%, var(--aurora-b) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 40% at 50% 80%, var(--aurora-c) 0%, transparent 60%);
-  background-size: 200% 200%, 180% 180%, 160% 160%;
+    radial-gradient(ellipse 70% 55% at 18% 38%, var(--aurora-a) 0%, transparent 76%),
+    radial-gradient(ellipse 58% 62% at 82% 52%, var(--aurora-b) 0%, transparent 74%),
+    radial-gradient(ellipse 48% 44% at 48% 72%, var(--aurora-c) 0%, transparent 72%),
+    radial-gradient(ellipse 42% 38% at 68% 28%, var(--aurora-d) 0%, transparent 70%);
+  background-size: 220% 220%, 200% 200%, 180% 180%, 190% 190%;
 }
 
 .ambient-aurora-animate {
-  animation: aurora-drift 32s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation: aurora-drift 36s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+  animation-delay: -5s;
 }
 
 .ambient-orb {
-  filter: blur(64px);
-  opacity: 0.85;
+  filter: blur(88px);
+  transform-origin: center center;
 }
 .ambient-orb-1 {
   background: var(--orb-1);
   animation:
-    breathe 16s cubic-bezier(0.45, 0.05, 0.25, 1) infinite,
-    orb-color-1 24s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+    orb-pulse-1 22s cubic-bezier(0.37, 0, 0.18, 1) infinite,
+    orb-color-1 31s cubic-bezier(0.37, 0, 0.18, 1) infinite;
 }
 .ambient-orb-2 {
   background: var(--orb-2);
   animation:
-    breathe-alt 20s cubic-bezier(0.45, 0.05, 0.25, 1) infinite,
-    orb-color-2 26s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
-  animation-delay: -7s, -4s;
+    orb-pulse-2 27s cubic-bezier(0.37, 0, 0.18, 1) infinite,
+    orb-color-2 35s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+  animation-delay: -9s, -6s;
 }
 .ambient-orb-3 {
   background: var(--orb-3);
   animation:
-    breathe-slow 24s cubic-bezier(0.45, 0.05, 0.25, 1) infinite,
-    orb-color-3 30s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
-  animation-delay: -12s, -9s;
+    orb-pulse-3 33s cubic-bezier(0.37, 0, 0.18, 1) infinite,
+    orb-color-3 39s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+  animation-delay: -16s, -11s;
+}
+.ambient-orb-4 {
+  background: var(--orb-4);
+  animation:
+    orb-pulse-4 25s cubic-bezier(0.37, 0, 0.18, 1) infinite,
+    orb-color-4 28s cubic-bezier(0.37, 0, 0.18, 1) infinite;
+  animation-delay: -4s, -13s;
 }
 
 .ambient-ray {
