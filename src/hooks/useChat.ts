@@ -82,7 +82,6 @@ async function streamResponse(
     settings.systemPrompt,
     priorImageUrls,
     settings.searchMode,
-    settings.routerModel,
     settings.debugMode
   );
 

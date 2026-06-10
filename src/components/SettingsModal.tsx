@@ -16,7 +16,6 @@ import {
   Cpu,
   Globe,
   Bug,
-  Route,
 } from "lucide-react";
 import { ModelPicker } from "@/components/ModelPicker";
 import type { SearchMode, Theme } from "@/types";
@@ -36,8 +35,10 @@ export function SettingsModal() {
         ...settings,
         displayName: settings.displayName ?? "",
         braveApiKey: settings.braveApiKey ?? "",
-        routerModel: settings.routerModel ?? "",
-        searchMode: settings.searchMode ?? "auto",
+        searchMode:
+          settings.searchMode === "always" || settings.searchMode === "never"
+            ? settings.searchMode
+            : "auto",
         debugMode: settings.debugMode ?? false,
       });
     }
@@ -282,7 +283,6 @@ export function SettingsModal() {
                       {(
                         [
                           ["auto", "Auto"],
-                          ["aggressive", "Aggressive"],
                           ["always", "Always"],
                           ["never", "Never"],
                         ] as const
@@ -308,38 +308,8 @@ export function SettingsModal() {
                       ))}
                     </div>
                     <Hint>
-                      Auto uses fast heuristics. Aggressive runs the orchestrator
-                      model on every turn to plan web search and images. Always /
+                      Auto uses heuristics to decide when to search. Always /
                       Never force search on or off.
-                    </Hint>
-                  </Field>
-
-                  <Field
-                    label={
-                      local.searchMode === "aggressive"
-                        ? "Orchestrator model"
-                        : "Router model (optional)"
-                    }
-                    icon={Route}
-                  >
-                    <ModelPicker
-                      variant="panel"
-                      value={local.routerModel}
-                      onChange={(name) =>
-                        setLocal((l) => ({ ...l, routerModel: name }))
-                      }
-                      allowEmpty={local.searchMode !== "aggressive"}
-                      emptyLabel={
-                        local.searchMode === "aggressive"
-                          ? "Required for aggressive mode"
-                          : "None — heuristics only"
-                      }
-                      allowManualEntry
-                    />
-                    <Hint>
-                      {local.searchMode === "aggressive"
-                        ? "Small fast model (e.g. gemma4:2b) plans web search, images, and tools before the main model runs."
-                        : "Consulted when Auto mode is uncertain. Pick any installed model or type a name."}
                     </Hint>
                   </Field>
                 </div>

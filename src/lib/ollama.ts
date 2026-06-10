@@ -21,7 +21,6 @@ function proxyBody(
     systemPrompt?: string;
     priorImageUrls?: string[];
     searchMode?: SearchMode;
-    routerModel?: string;
     debugMode?: boolean;
   }
 ) {
@@ -37,9 +36,6 @@ function proxyBody(
       : {}),
     ...(extras?.searchMode !== undefined
       ? { _searchMode: extras.searchMode }
-      : {}),
-    ...(extras?.routerModel !== undefined
-      ? { _routerModel: extras.routerModel }
       : {}),
     ...(extras?.debugMode !== undefined ? { _debugMode: extras.debugMode } : {}),
   };
@@ -85,7 +81,6 @@ export async function* streamAgent(
   systemPrompt = "",
   priorImageUrls: string[] = [],
   searchMode: SearchMode = "auto",
-  routerModel = "",
   debugMode = false
 ): AsyncGenerator<AgentStreamEvent> {
   const res = await fetch("/api/agent", {
@@ -99,7 +94,6 @@ export async function* streamAgent(
         systemPrompt,
         priorImageUrls,
         searchMode,
-        routerModel,
         debugMode,
       }),
     }),

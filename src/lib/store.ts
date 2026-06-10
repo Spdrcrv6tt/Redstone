@@ -57,7 +57,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiKey: "",
   braveApiKey: "",
   defaultModel: PREFERRED_DEFAULT_MODEL,
-  routerModel: "",
   searchMode: "auto",
   debugMode: false,
   streamResponses: true,
@@ -211,7 +210,10 @@ export const useAppStore = create<AppState>()(
             defaultModel:
               saved.settings?.defaultModel || DEFAULT_SETTINGS.defaultModel,
             searchMode:
-              saved.settings?.searchMode || DEFAULT_SETTINGS.searchMode,
+              saved.settings?.searchMode === "always" ||
+              saved.settings?.searchMode === "never"
+                ? saved.settings.searchMode
+                : DEFAULT_SETTINGS.searchMode,
             debugMode:
               saved.settings?.debugMode ?? DEFAULT_SETTINGS.debugMode,
             localOllamaHost:

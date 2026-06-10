@@ -72,7 +72,6 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
               decision.confidence
                 ? `Confidence: ${decision.confidence}`
                 : null,
-              decision.routerUsed ? "Router model consulted: yes" : null,
               debug?.searchMs !== undefined
                 ? `Search time: ${debug.searchMs}ms`
                 : null,
@@ -80,38 +79,12 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
                 ? `Image time: ${debug.imageMs}ms`
                 : null,
               search?.query ? `Query: ${search.query}` : null,
-              decision.orchestrator
-                ? [
-                    decision.orchestrator.intent
-                      ? `Watchdog intent: ${decision.orchestrator.intent}`
-                      : null,
-                    decision.orchestrator.uiHint
-                      ? `Watchdog UI hint: ${decision.orchestrator.uiHint}`
-                      : null,
-                    `Watchdog web: ${decision.orchestrator.webSearch}`,
-                    decision.orchestrator.optimizedSearchQuery
-                      ? `Watchdog search query: ${decision.orchestrator.optimizedSearchQuery}`
-                      : null,
-                    `Watchdog image: ${decision.orchestrator.imageSearch}`,
-                    decision.orchestrator.imageQuery
-                      ? `Watchdog image query: ${decision.orchestrator.imageQuery}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join("\n")
-                : null,
               `Sources: ${search?.sources.length ?? 0}`,
               `Images: ${search?.images.length ?? 0}`,
             ]
               .filter(Boolean)
               .join("\n")}
           />
-        </Section>
-      )}
-
-      {decision?.orchestrator?.watchdogRaw && (
-        <Section title="Watchdog decision (raw JSON)">
-          <MonoBlock text={decision.orchestrator.watchdogRaw} />
         </Section>
       )}
 

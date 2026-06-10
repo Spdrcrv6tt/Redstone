@@ -29,7 +29,7 @@ export interface SearchImage {
   height?: number;
 }
 
-export type SearchMode = "auto" | "always" | "never" | "aggressive";
+export type SearchMode = "auto" | "always" | "never";
 
 export type AgentPipelineStatus =
   | "routing"
@@ -42,24 +42,10 @@ export interface AgentStatusMeta {
   message: string;
 }
 
-export interface OrchestratorDecisionMeta {
-  intent: string;
-  uiHint: string;
-  webSearch: boolean;
-  optimizedSearchQuery: string;
-  imageSearch: boolean;
-  imageQuery: string;
-  reason: string;
-  /** Raw model output from the watchdog decision call (debug only). */
-  watchdogRaw?: string;
-}
-
 export interface SearchDecisionMeta {
   ran: boolean;
   reason: string;
   confidence?: string;
-  routerUsed?: boolean;
-  orchestrator?: OrchestratorDecisionMeta;
   mode: SearchMode;
 }
 
@@ -168,7 +154,6 @@ export interface AppSettings {
   apiKey: string;
   braveApiKey: string;
   defaultModel: string;
-  routerModel: string;
   searchMode: SearchMode;
   debugMode: boolean;
   streamResponses: boolean;

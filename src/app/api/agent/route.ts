@@ -13,24 +13,15 @@ import {
 } from "@/lib/search/brave";
 import { enhanceSearchQuery } from "@/lib/search/query-enhance";
 import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
-import {
-  imagePlanFromOrchestrator,
-  runOrchestrator,
-  type RouterUiHint,
-} from "@/lib/search/orchestrator";
 import { buildAugmentedSystemPrompt } from "@/lib/search/prompt";
-import { routerWantsSearch } from "@/lib/search/router";
 import {
   encodeMetaLine,
   encodeStatusLine,
-  type AgentStatusEvent,
 } from "@/lib/search/stream-protocol";
-import type { ImageSearchPlan } from "@/lib/search/coordinator";
 import type { OllamaChatMessage } from "@/types";
 import type {
   AgentPipelineStatus,
   AgentStreamMeta,
-  OrchestratorDecisionMeta,
   SearchMode,
   SearchSource,
 } from "@/types";
@@ -42,20 +33,11 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-function lastAssistantSnippet(messages: OllamaChatMessage[]): string {
-  const last = [...messages].reverse().find((m) => m.role === "assistant");
-  return last?.content?.trim() ?? "";
-}
-
 function parseSearchMode(value: unknown): SearchMode {
-  if (
-    value === "always" ||
-    value === "never" ||
-    value === "auto" ||
-    value === "aggressive"
-  ) {
+  if (value === "always" || value === "never" || value === "auto") {
     return value;
   }
+  // Legacy clients may still send "aggressive" — treat as auto.
   return "auto";
 }
 
@@ -81,14 +63,11 @@ function filterBlacklistedSources(sources: SearchSource[]): SearchSource[] {
 }
 
 interface PipelineInput {
-  host: string;
-  apiKey: string;
   braveKey: string;
   conversationMessages: OllamaChatMessage[];
   rawUserQuery: string;
   priorImageUrls: string[];
   searchMode: SearchMode;
-  routerModel: string;
   debugMode: boolean;
   userSystemPrompt: string;
   emitStatus: StatusEmitter;
@@ -102,14 +81,11 @@ interface PipelineResult {
 
 async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   const {
-    host,
-    apiKey,
     braveKey,
     conversationMessages,
     rawUserQuery,
     priorImageUrls,
     searchMode,
-    routerModel,
     debugMode,
     userSystemPrompt,
     emitStatus,
@@ -121,6 +97,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   let imageError: string | undefined;
   let searchMs: number | undefined;
   let imageMs: number | undefined;
+
   const draftPlan = planTurn(
     conversationMessages,
     rawUserQuery,
@@ -131,71 +108,10 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   let runWebSearch = draftPlan.needsWebSearch;
   let searchReason = draftPlan.searchDecision.reason;
   let searchConfidence = draftPlan.searchDecision.confidence;
-  let routerUsed = false;
-  let orchestratorMeta: OrchestratorDecisionMeta | undefined;
-  let overrideWebQuery = "";
-  let overrideImagePlan: ImageSearchPlan | null = null;
-  let watchdogUiHint: RouterUiHint | undefined;
-  // When watchdog explicitly decides no image, suppress the heuristic plan.
-  let watchdogSuppressImage = false;
 
-  emitStatus("routing", "Evaluating query intent...");
+  emitStatus("routing", "Planning turn…");
 
-  if (searchMode === "aggressive") {
-
-    if (!routerModel) {
-      searchReason = "aggressive mode requires orchestrator model in Settings";
-      runWebSearch = draftPlan.needsWebSearch;
-    } else {
-      const orchResult = await runOrchestrator(
-        host,
-        apiKey,
-        routerModel,
-        rawUserQuery,
-        lastAssistantSnippet(conversationMessages)
-      );
-
-      routerUsed = true;
-
-      const orch = orchResult.plan;
-      if (orch) {
-        runWebSearch = orch.webSearch;
-        overrideWebQuery =
-          orch.optimizedSearchQuery || draftPlan.webSearchQuery;
-        watchdogUiHint = orch.uiHint;
-        searchReason = `watchdog: ${orch.intent} (${orch.uiHint})`;
-        searchConfidence = "high";
-        orchestratorMeta = {
-          intent: orch.intent,
-          uiHint: orch.uiHint,
-          webSearch: orch.webSearch,
-          optimizedSearchQuery: orch.optimizedSearchQuery,
-          imageSearch: orch.imageSearch,
-          imageQuery: orch.imageQuery,
-          reason: searchReason,
-          watchdogRaw: orchResult.raw,
-        };
-
-        if (orch.imageSearch) {
-          overrideImagePlan = imagePlanFromOrchestrator(
-            orch.imageQuery,
-            priorImageUrls
-          );
-        } else {
-          // Watchdog explicitly ruled out images — don't let heuristics override.
-          watchdogSuppressImage = true;
-        }
-      } else {
-        runWebSearch = draftPlan.needsWebSearch;
-        const failReason = orchResult.error ?? "unknown";
-        searchReason = `watchdog failed (${failReason}) — using heuristics`;
-        searchConfidence = "low";
-        if (orchResult.raw) {
-          console.warn("[watchdog] raw output:", orchResult.raw);
-        }
-      }
-    }
-  } else if (searchMode === "always") {
+  if (searchMode === "always") {
     runWebSearch = true;
     searchReason = "search mode: always";
     searchConfidence = "high";
@@ -203,35 +119,10 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     runWebSearch = false;
     searchReason = "search mode: never";
     searchConfidence = "high";
-  } else if (
-    !runWebSearch &&
-    searchConfidence === "low" &&
-    routerModel
-  ) {
-    const wants = await routerWantsSearch(
-      host,
-      apiKey,
-      routerModel,
-      rawUserQuery,
-      lastAssistantSnippet(conversationMessages)
-    );
-    routerUsed = true;
-    if (wants) {
-      runWebSearch = true;
-      searchReason = "router model: YES";
-      searchConfidence = "low";
-    } else {
-      searchReason = "router model: NO";
-    }
   }
 
-  const webQuery =
-    overrideWebQuery || draftPlan.webSearchQuery;
-  const finalSearchQuery = enhanceSearchQuery(webQuery);
-
-  const imagePlanEarly = watchdogSuppressImage
-    ? null
-    : overrideImagePlan ?? draftPlan.imageSearch;
+  const finalSearchQuery = enhanceSearchQuery(draftPlan.webSearchQuery);
+  const imagePlanEarly = draftPlan.imageSearch;
 
   const needsWeb = runWebSearch && !!finalSearchQuery && !!braveKey;
   const needsImage = !!imagePlanEarly && !!braveKey;
@@ -248,7 +139,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     }> => {
       if (!needsWeb) return { sources: [] };
       try {
-        if (draftPlan.exhaustiveList && !overrideWebQuery) {
+        if (draftPlan.exhaustiveList) {
           const queries = [
             enhanceSearchQuery(draftPlan.webSearchQuery),
             ...draftPlan.supplementalWebQueries.map(enhanceSearchQuery),
@@ -340,8 +231,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     sources,
     visualMode,
     searchError,
-    runWebSearch,
-    watchdogUiHint
+    runWebSearch
   );
 
   const upstreamMessages: OllamaChatMessage[] = [
@@ -357,9 +247,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
       ran: runWebSearch,
       reason: searchReason,
       confidence: searchConfidence,
-      routerUsed,
       mode: searchMode,
-      ...(orchestratorMeta ? { orchestrator: orchestratorMeta } : {}),
     },
     ...(searchError ? { searchError } : {}),
     ...(imageError ? { imageError } : {}),
@@ -393,7 +281,7 @@ export async function POST(req: NextRequest) {
     _systemPrompt,
     _priorImageUrls,
     _searchMode,
-    _routerModel,
+    _routerModel: ___,
     _debugMode,
     ...ollamaBody
   } = body as {
@@ -430,8 +318,6 @@ export async function POST(req: NextRequest) {
     ? _priorImageUrls.filter((u): u is string => typeof u === "string")
     : [];
   const searchMode = parseSearchMode(_searchMode);
-  const routerModel =
-    typeof _routerModel === "string" ? _routerModel.trim() : "";
   const debugMode = _debugMode === true;
   const userSystemPrompt =
     typeof _systemPrompt === "string" ? _systemPrompt : "";
@@ -448,14 +334,11 @@ export async function POST(req: NextRequest) {
 
       try {
         const pipeline = await runAgentPipeline({
-          host,
-          apiKey,
           braveKey,
           conversationMessages,
           rawUserQuery,
           priorImageUrls,
           searchMode,
-          routerModel,
           debugMode,
           userSystemPrompt,
           emitStatus,
