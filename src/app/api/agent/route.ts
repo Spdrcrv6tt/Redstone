@@ -13,7 +13,10 @@ import {
 } from "@/lib/search/brave";
 import { enhanceSearchQuery } from "@/lib/search/query-enhance";
 import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
-import { buildAugmentedSystemPrompt } from "@/lib/search/prompt";
+import {
+  buildAugmentedSystemPrompt,
+  buildDiagramSystemPrompt,
+} from "@/lib/search/prompt";
 import {
   encodeMetaLine,
   encodeStatusLine,
@@ -125,7 +128,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   const imagePlanEarly = draftPlan.imageSearch;
 
   const needsWeb = runWebSearch && !!finalSearchQuery && !!braveKey;
-  const needsImage = !!imagePlanEarly && !!braveKey;
+  const needsImage =
+    !!imagePlanEarly && !!braveKey && !draftPlan.needsDiagram;
 
   if (runWebSearch && !braveKey) {
     searchError = "Brave Search API key is not configured";
@@ -223,16 +227,29 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 
   const visualMode = finalizeVisualMode(turnPlan, images.length);
 
-  emitStatus("injecting", "Purifying and binding verified context...");
-
-  const systemContent = buildAugmentedSystemPrompt(
-    userSystemPrompt,
-    turnPlan,
-    sources,
-    visualMode,
-    searchError,
-    runWebSearch
+  emitStatus(
+    "injecting",
+    turnPlan.needsDiagram
+      ? "Preparing interactive diagram prompt..."
+      : "Purifying and binding verified context..."
   );
+
+  const systemContent = turnPlan.needsDiagram
+    ? buildDiagramSystemPrompt(
+        userSystemPrompt,
+        turnPlan,
+        sources,
+        searchError,
+        runWebSearch
+      )
+    : buildAugmentedSystemPrompt(
+        userSystemPrompt,
+        turnPlan,
+        sources,
+        visualMode,
+        searchError,
+        runWebSearch
+      );
 
   const upstreamMessages: OllamaChatMessage[] = [
     { role: "system", content: systemContent },

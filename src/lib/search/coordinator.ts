@@ -53,6 +53,7 @@ export interface TurnPlan {
   explicitVisualRequest: boolean;
   exhaustiveList: boolean;
   needsWebSearch: boolean;
+  needsDiagram: boolean;
   searchDecision: SearchDecision;
 }
 
@@ -268,6 +269,7 @@ function inferLastFocus(prior: OllamaChatMessage[]): FocusRef | null {
 /* ─── Intent ────────────────────────────────────────────────────────────── */
 
 type Intent =
+  | "interactive_diagram"
   | "explicit_visual"
   | "narrow_fact"
   | "person_who"
@@ -275,8 +277,29 @@ type Intent =
   | "follow_up"
   | "general";
 
+/** Photo/image requests — bare "show me" intentionally excluded (diagrams use interactive_diagram). */
 const EXPLICIT_VISUAL =
-  /\b(?:(?:have|got|want|need|see|show|display)(?:\s+(?:me|a|an|any|his|her|their))?\s*(?:[\w']+\s+){0,3}?(?:photos?|images?|pictures?)|(?:show|display)\s+(?:his|her|their)\s+(?:[\w']+\s+){0,4}?(?:photos?|images?|pictures?)|(?:any|a|an)\s+(?:photos?|images?|pictures?)|(?:photo|picture|image)\s+of\b|(?:photo|picture)\s*(?:please|pls)?|show\s+me)\b/i;
+  /\b(?:(?:have|got|want|need|see|show|display)(?:\s+(?:me|a|an|any|his|her|their))?\s*(?:[\w']+\s+){0,3}?(?:photos?|images?|pictures?)|(?:show|display)\s+(?:his|her|their)\s+(?:[\w']+\s+){0,4}?(?:photos?|images?|pictures?)|(?:any|a|an)\s+(?:photos?|images?|pictures?)|(?:photo|picture|image)\s+of\b|(?:photo|picture)\s*(?:please|pls)?)\b/i;
+
+const DEMANDS_INTERACTIVE_DIAGRAM =
+  /(?:diagram|visualization|visualisation|interactive model|how .+ works visually|simulate|animate|visualize|visualise)/i;
+
+const WRITES_HTML_PAGE =
+  /\b(write|draft|create|build)\b[\s\S]{0,48}\b(html|landing page|web page|website)\b/i;
+
+/** User wants an interactive in-chat diagram — not a photo search or markdown code dump. */
+export function demandsInteractiveDiagram(query: string): boolean {
+  const q = query.trim();
+  if (!q || WRITES_HTML_PAGE.test(q)) return false;
+  if (DEMANDS_INTERACTIVE_DIAGRAM.test(q)) return true;
+  if (/\bshow\s+me\s+(?:an?\s+)?(?:interactive\s+)?diagram\b/i.test(q)) {
+    return true;
+  }
+  if (/\b(?:learn|understand)\b[\s\S]{0,48}\b(?:visually|diagram)\b/i.test(q)) {
+    return true;
+  }
+  return false;
+}
 
 const PERSON_PRONOUN =
   /\b(?:image|photo|picture)s?\s+of\s+(?:him|her|them)\b|\b(?:him|her|his|he|she)\b/i;
@@ -361,6 +384,7 @@ function buildListSearchQueries(
 
 function classifyIntent(query: string): Intent {
   const q = query.trim();
+  if (demandsInteractiveDiagram(q)) return "interactive_diagram";
   if (EXPLICIT_VISUAL.test(q)) return "explicit_visual";
   if (NARROW_FACT.test(q)) return "narrow_fact";
   if (PERSON_WHO.test(q)) return "person_who";
@@ -418,6 +442,14 @@ export function decideWebSearch(
     return {
       search: true,
       reason: "high-density data request",
+      confidence: "high",
+    };
+  }
+
+  if (demandsInteractiveDiagram(q)) {
+    return {
+      search: true,
+      reason: "interactive visualization requested",
       confidence: "high",
     };
   }
@@ -822,12 +854,16 @@ export function planTurn(
     supplementalWebQueries = listQueries.slice(1);
   }
 
-  const explicitVisualRequest = intent === "explicit_visual";
+  const needsDiagram = demandsInteractiveDiagram(raw);
+  const explicitVisualRequest =
+    intent === "explicit_visual" && !needsDiagram;
   const searchDecision = decideWebSearch(raw, memory, intent, exhaustiveList);
 
   let answerStyle: AnswerStyle = "standard";
   if (exhaustiveList) {
     answerStyle = "exhaustive";
+  } else if (needsDiagram) {
+    answerStyle = "narrative";
   } else if (NARROW_FACT.test(raw) || (PERSON_WHO.test(raw) && raw.split(/\s+/).length < 14)) {
     answerStyle = "narrow";
   } else if (intent === "follow_up" && /\b(career|story|history|full)\b/i.test(raw)) {
@@ -840,9 +876,10 @@ export function planTurn(
   let imageSearch: ImageSearchPlan | null = null;
 
   const shouldTryImage =
-    explicitVisualRequest ||
-    intent === "person_who" ||
-    intent === "object_visual";
+    !needsDiagram &&
+    (explicitVisualRequest ||
+      intent === "person_who" ||
+      intent === "object_visual");
 
   if (shouldTryImage) {
     const subject = resolveVisualSubject(intent, raw, memory, sources);
@@ -882,6 +919,7 @@ export function planTurn(
     explicitVisualRequest,
     exhaustiveList,
     needsWebSearch: searchDecision.search,
+    needsDiagram,
     searchDecision,
   };
 }

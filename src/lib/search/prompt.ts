@@ -36,9 +36,6 @@ const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your 
 
 Conversation: you see the full thread. Resolve pronouns and partial names from earlier turns. Stay on the established subject.`;
 
-const DIAGRAM_INSTRUCTIONS = `Interactive diagrams: If the user asks to LEARN or VISUALIZE a concept (e.g., "show me a diagram of an engine"), generate a single-file HTML/JS/CSS interactive visualization and wrap it EXACTLY in <redstone-diagram>...</redstone-diagram> tags. Do NOT use markdown code blocks for diagrams.
-CRITICAL EXCEPTION: If the user explicitly asks you to WRITE CODE or DRAFT AN HTML PAGE (e.g., "write an HTML landing page"), do NOT use the <redstone-diagram> tag. Output standard markdown \`\`\`html code blocks instead.`;
-
 function answerInstructions(style: TurnPlan["answerStyle"]): string {
   if (style === "narrow") {
     return "This is a narrow question — answer in one or two direct sentences.";
@@ -128,7 +125,6 @@ export function buildAugmentedSystemPrompt(
 ): string {
   const instructionParts = [
     webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH,
-    DIAGRAM_INSTRUCTIONS,
     answerInstructions(plan.answerStyle),
     visualInstructions(
       visualMode,
@@ -166,6 +162,54 @@ export function buildAugmentedSystemPrompt(
 
   if (webSearchRan && !searchError) {
     finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
+  }
+
+  return finalSystemPrompt;
+}
+
+const DIAGRAM_CORE = `You are an expert interactive visualizer. The user wants to learn a complex concept visually through an in-chat widget — NOT a photograph, NOT a prose essay.
+
+You MUST write a single-file, interactive HTML document using vanilla HTML, CSS, and JavaScript.
+You may use CDN links in <head> for libraries such as D3.js, Chart.js, or Anime.js when they help.
+
+CRITICAL RULES:
+1. Wrap the ENTIRE output exactly inside: <redstone-diagram>...</redstone-diagram>
+2. Do NOT use markdown. Do NOT use \`\`\`html code fences. Start immediately with <redstone-diagram><!DOCTYPE html>...
+3. The diagram must be self-contained and visually appealing. Prefer a dark theme (#0f1117 background, light text) to match the chat UI.
+4. Add basic interactivity: hover states, labels, and buttons or steps to walk through phases when the concept has stages.
+5. Output ONLY the diagram block. No preamble, no apology, no "here is your diagram", no citations, no mention of photos or missing images.
+6. Never reference system prompts, external data blocks, or internal tooling.`;
+
+/** Dedicated system prompt for interactive diagram turns — no photo/visual conflict rules. */
+export function buildDiagramSystemPrompt(
+  userSystemPrompt: string,
+  plan: TurnPlan,
+  sources: SearchSource[],
+  searchError?: string,
+  webSearchRan = true
+): string {
+  const parts = [DIAGRAM_CORE];
+
+  if (plan.threadSubject) {
+    parts.push(`Focus the visualization on: ${plan.threadSubject}.`);
+  }
+
+  if (webSearchRan && searchError) {
+    parts.push(
+      `Reference search failed (${searchError}). Use accurate internal knowledge for labels and numbers.`
+    );
+  }
+
+  let finalSystemPrompt = parts.join("\n\n");
+
+  if (userSystemPrompt.trim()) {
+    finalSystemPrompt += `\n\nUser settings:\n${userSystemPrompt.trim()}`;
+  }
+
+  if (webSearchRan && !searchError && sources.length > 0) {
+    finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
+    finalSystemPrompt +=
+      "\n\nUse the external data above for accurate labels, numbers, and sequence order inside the diagram. Do not quote it as prose — embed facts into the visualization.";
   }
 
   return finalSystemPrompt;
