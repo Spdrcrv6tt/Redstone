@@ -17,6 +17,10 @@ import type {
   CanvasPatch,
   EngineMode,
 } from "@/types/canvas";
+import {
+  DEFAULT_THINKING_ORBS,
+  normalizeThinkingOrbs,
+} from "@/lib/thinking-orbs";
 import { generateId } from "@/lib/utils";
 import { generateTitle } from "@/lib/ollama";
 
@@ -86,6 +90,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   systemPrompt: "",
   temperature: 0.7,
   displayName: "",
+  thinkingOrbs: DEFAULT_THINKING_ORBS,
 };
 
 export const useAppStore = create<AppState>()(
@@ -299,6 +304,7 @@ export const useAppStore = create<AppState>()(
               saved.settings?.debugMode ?? DEFAULT_SETTINGS.debugMode,
             localOllamaHost:
               saved.settings?.localOllamaHost ?? DEFAULT_SETTINGS.localOllamaHost,
+            thinkingOrbs: normalizeThinkingOrbs(saved.settings?.thinkingOrbs),
           },
         };
       },

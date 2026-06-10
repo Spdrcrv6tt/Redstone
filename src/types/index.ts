@@ -176,6 +176,16 @@ export interface OllamaChatResponseChunk {
   eval_count?: number;
 }
 
+export type ThinkingOrbPath = "circular" | "triangular" | "atom" | "star4";
+
+export interface ThinkingOrbSettings {
+  count: number;
+  speed: number;
+  radius: number;
+  path: ThinkingOrbPath;
+  colors: string[];
+}
+
 export interface AppSettings {
   ollamaHost: string;
   localOllamaHost: string;
@@ -188,4 +198,5 @@ export interface AppSettings {
   systemPrompt: string;
   temperature: number;
   displayName: string;
+  thinkingOrbs: ThinkingOrbSettings;
 }

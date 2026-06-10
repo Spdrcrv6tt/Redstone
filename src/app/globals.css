@@ -1117,17 +1117,6 @@ button.source-cite {
   height: 100%;
 }
 
-@keyframes agent-dot-pulse {
-  0%, 100% {
-    opacity: 0.72;
-    transform: scale(0.88);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-}
-
 .agent-status-dot {
   position: absolute;
   top: 50%;
@@ -1142,25 +1131,9 @@ button.source-cite {
 }
 
 .agent-status-dot--work {
-  animation: agent-dot-pulse 0.65s ease-in-out infinite;
-  box-shadow: 0 0 8px currentColor;
-}
-
-.agent-status-dot--work.agent-status-dot--0 {
-  color: #ff0033;
-  background-color: #ff0033;
-}
-
-.agent-status-dot--work.agent-status-dot--1 {
-  color: #00e636;
-  background-color: #00e636;
-  animation-delay: -0.22s;
-}
-
-.agent-status-dot--work.agent-status-dot--2 {
-  color: #1a7fff;
-  background-color: #1a7fff;
-  animation-delay: -0.44s;
+  opacity: 1;
+  box-shadow: none;
+  filter: none;
 }
 .agent-status-text {
   font-size: 0.8125rem;
@@ -1244,7 +1217,6 @@ button.source-cite {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-status-dot--work,
   .composer-surface--thinking-canvas {
     animation: none !important;
   }

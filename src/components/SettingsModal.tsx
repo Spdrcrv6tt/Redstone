@@ -19,9 +19,17 @@ import {
   LogOut,
 } from "lucide-react";
 import { ModelPicker } from "@/components/ModelPicker";
-import type { SearchMode, Theme } from "@/types";
+import type { SearchMode, Theme, ThinkingOrbPath } from "@/types";
 import { useAppStore } from "@/lib/store";
 import type { AppSettings } from "@/types";
+import {
+  DEFAULT_THINKING_ORBS,
+  ensureOrbColors,
+  normalizeThinkingOrbs,
+  THINKING_ORB_MAX,
+  THINKING_ORB_MIN,
+  THINKING_ORB_PATH_LABELS,
+} from "@/lib/thinking-orbs";
 
 export function SettingsModal() {
   const { settings, settingsOpen, theme, setSettingsOpen, updateSettings, setTheme } =
@@ -41,6 +49,9 @@ export function SettingsModal() {
             ? settings.searchMode
             : "auto",
         debugMode: settings.debugMode ?? false,
+        thinkingOrbs: normalizeThinkingOrbs(
+          settings.thinkingOrbs ?? DEFAULT_THINKING_ORBS
+        ),
       });
     }
   }, [settingsOpen, settings]);
@@ -55,7 +66,10 @@ export function SettingsModal() {
   }, [settingsOpen, setSettingsOpen]);
 
   const save = () => {
-    updateSettings(local);
+    updateSettings({
+      ...local,
+      thinkingOrbs: normalizeThinkingOrbs(local.thinkingOrbs),
+    });
     setSettingsOpen(false);
   };
 
@@ -344,6 +358,182 @@ export function SettingsModal() {
                     </span>
                   </label>
                 </Field>
+
+                {local.debugMode ? (
+                  <div className="mt-5 space-y-4 rounded-xl border border-theme bg-surface-muted/50 p-4">
+                    <p className="text-sm font-medium text-primary">
+                      Thinking orbs
+                    </p>
+                    <div>
+                      <p className="text-sm font-medium text-primary mb-2">
+                        Orb count
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min={THINKING_ORB_MIN}
+                          max={THINKING_ORB_MAX}
+                          step={1}
+                          value={local.thinkingOrbs.count}
+                          onChange={(e) => {
+                            const count = Number.parseInt(e.target.value, 10);
+                            setLocal((l) => ({
+                              ...l,
+                              thinkingOrbs: normalizeThinkingOrbs({
+                                ...l.thinkingOrbs,
+                                count,
+                                colors: ensureOrbColors(
+                                  l.thinkingOrbs.colors,
+                                  count
+                                ),
+                              }),
+                            }));
+                          }}
+                          className="range-track flex-1"
+                        />
+                        <span className="text-xs font-medium text-primary w-6 text-right">
+                          {local.thinkingOrbs.count}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-primary mb-2">
+                        Orbit speed
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min={0.4}
+                          max={5}
+                          step={0.1}
+                          value={local.thinkingOrbs.speed}
+                          onChange={(e) =>
+                            setLocal((l) => ({
+                              ...l,
+                              thinkingOrbs: {
+                                ...l.thinkingOrbs,
+                                speed: Number.parseFloat(e.target.value),
+                              },
+                            }))
+                          }
+                          className="range-track flex-1"
+                        />
+                        <span className="text-xs font-medium text-primary w-10 text-right">
+                          {local.thinkingOrbs.speed.toFixed(1)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-primary mb-2">
+                        Orbit radius
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min={4}
+                          max={18}
+                          step={1}
+                          value={local.thinkingOrbs.radius}
+                          onChange={(e) =>
+                            setLocal((l) => ({
+                              ...l,
+                              thinkingOrbs: {
+                                ...l.thinkingOrbs,
+                                radius: Number.parseInt(e.target.value, 10),
+                              },
+                            }))
+                          }
+                          className="range-track flex-1"
+                        />
+                        <span className="text-xs font-medium text-primary w-8 text-right">
+                          {local.thinkingOrbs.radius}px
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-primary mb-2">
+                        Path
+                      </p>
+                      <div className="segmented-control">
+                        {(
+                          Object.entries(THINKING_ORB_PATH_LABELS) as [
+                            ThinkingOrbPath,
+                            string,
+                          ][]
+                        ).map(([path, label]) => (
+                          <button
+                            key={path}
+                            type="button"
+                            onClick={() =>
+                              setLocal((l) => ({
+                                ...l,
+                                thinkingOrbs: { ...l.thinkingOrbs, path },
+                              }))
+                            }
+                            className={[
+                              "segmented-option",
+                              local.thinkingOrbs.path === path
+                                ? "segmented-option-active"
+                                : "",
+                            ].join(" ")}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-primary mb-2">
+                        Orb colors
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {local.thinkingOrbs.colors
+                          .slice(0, local.thinkingOrbs.count)
+                          .map((color, i) => (
+                            <label
+                              key={i}
+                              className="flex items-center gap-2 text-xs text-secondary"
+                            >
+                              <input
+                                type="color"
+                                value={color}
+                                onChange={(e) => {
+                                  const next = [...local.thinkingOrbs.colors];
+                                  next[i] = e.target.value;
+                                  setLocal((l) => ({
+                                    ...l,
+                                    thinkingOrbs: {
+                                      ...l.thinkingOrbs,
+                                      colors: next,
+                                    },
+                                  }));
+                                }}
+                                className="w-9 h-9 rounded-lg border border-theme cursor-pointer bg-transparent p-0.5"
+                              />
+                              #{i + 1}
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLocal((l) => ({
+                          ...l,
+                          thinkingOrbs: DEFAULT_THINKING_ORBS,
+                        }))
+                      }
+                      className="text-xs text-muted hover:text-primary transition-colors"
+                    >
+                      Reset orbs to defaults
+                    </button>
+                  </div>
+                ) : null}
               </section>
 
               <div className="settings-divider" />
