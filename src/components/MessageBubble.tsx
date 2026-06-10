@@ -38,6 +38,8 @@ export function MessageBubble({
     !isUser && !!message.content && hasWebPreview(message.content);
   const searchSources = message.search?.sources ?? [];
   const searchImages = message.search?.images ?? [];
+  const searchVideos = message.search?.videos ?? [];
+  const searchLinks = message.search?.links ?? [];
   const hasSearchImages = searchImages.length > 0;
   const assistantContent =
     !isUser && message.content ? cleanSearchResponse(message.content) : "";
@@ -52,15 +54,17 @@ export function MessageBubble({
     setImageReady(false);
   }, [message.id, hasSearchImages]);
 
-  const hasWidgetOpen =
+  const hasRichBlockOpen =
     !!assistantContent &&
     (/<redstone-widget\b/i.test(assistantContent) ||
-      /<redstone-image\b/i.test(assistantContent));
+      /<redstone-image\b/i.test(assistantContent) ||
+      /<redstone-flashcards\b/i.test(assistantContent) ||
+      /<redstone-quiz\b/i.test(assistantContent));
   const isPending =
     message.isStreaming || (hasSearchImages && !imageReady);
   const canRevealBody =
     !!assistantContent &&
-    (!isPending || (hasWidgetOpen && !!assistantContent));
+    (!isPending || (hasRichBlockOpen && !!assistantContent));
   const showStatus =
     message.isStreaming && !assistantContent && message.agentStatus;
 
@@ -193,6 +197,8 @@ export function MessageBubble({
                   <AssistantArticle
                     content={assistantContent}
                     images={searchImages}
+                    videos={searchVideos}
+                    links={searchLinks}
                     searchSources={searchSources}
                     previewTargetId={
                       showLivePreview ? previewId : undefined

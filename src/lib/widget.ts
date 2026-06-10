@@ -1,5 +1,7 @@
 import { parseImageGenerationSpec } from "@/lib/image-gen";
+import { parseFlashcardDeck, parseStudyQuiz } from "@/lib/study";
 import type { ImageGenerationSpec } from "@/types/image-gen";
+import type { FlashcardDeckSpec, StudyQuizSpec } from "@/types/study";
 import type { WidgetArchitectSpec } from "@/types/widget";
 
 export type ContentSegment =
@@ -7,10 +9,37 @@ export type ContentSegment =
   | { type: "widget"; spec: WidgetArchitectSpec }
   | { type: "widget-pending" }
   | { type: "image"; spec: ImageGenerationSpec }
-  | { type: "image-pending" };
+  | { type: "image-pending" }
+  | { type: "flashcards"; spec: FlashcardDeckSpec }
+  | { type: "flashcards-pending" }
+  | { type: "quiz"; spec: StudyQuizSpec }
+  | { type: "quiz-pending" };
 
 const ASSISTANT_BLOCK_RE =
-  /<(redstone-widget|redstone-image)\s*>([\s\S]*?)<\/\1\s*>/gi;
+  /<(redstone-widget|redstone-image|redstone-flashcards|redstone-quiz)\s*>([\s\S]*?)<\/\1\s*>/gi;
+
+const OPEN_TAG_DEFS = [
+  {
+    tag: "redstone-widget",
+    open: /<redstone-widget\s*>/i,
+    close: /<\/redstone-widget\s*>/i,
+  },
+  {
+    tag: "redstone-image",
+    open: /<redstone-image\s*>/i,
+    close: /<\/redstone-image\s*>/i,
+  },
+  {
+    tag: "redstone-flashcards",
+    open: /<redstone-flashcards\s*>/i,
+    close: /<\/redstone-flashcards\s*>/i,
+  },
+  {
+    tag: "redstone-quiz",
+    open: /<redstone-quiz\s*>/i,
+    close: /<\/redstone-quiz\s*>/i,
+  },
+] as const;
 
 const WIDGET_OPEN_RE = /<redstone-widget\s*>/i;
 const WIDGET_CLOSE_RE = /<\/redstone-widget\s*>/i;
@@ -147,14 +176,63 @@ function pushBlockSegment(
   tag: string,
   payload: string
 ) {
-  if (tag.toLowerCase() === "redstone-image") {
-    const spec = parseImageGenerationSpec(payload);
-    segments.push(spec ? { type: "image", spec } : { type: "image-pending" });
-    return;
+  switch (tag.toLowerCase()) {
+    case "redstone-image": {
+      const spec = parseImageGenerationSpec(payload);
+      segments.push(spec ? { type: "image", spec } : { type: "image-pending" });
+      return;
+    }
+    case "redstone-flashcards": {
+      const spec = parseFlashcardDeck(payload);
+      segments.push(
+        spec ? { type: "flashcards", spec } : { type: "flashcards-pending" }
+      );
+      return;
+    }
+    case "redstone-quiz": {
+      const spec = parseStudyQuiz(payload);
+      segments.push(spec ? { type: "quiz", spec } : { type: "quiz-pending" });
+      return;
+    }
+    default: {
+      const spec = parseWidgetArchitectSpec(payload);
+      segments.push(spec ? { type: "widget", spec } : { type: "widget-pending" });
+    }
   }
+}
 
-  const spec = parseWidgetArchitectSpec(payload);
-  segments.push(spec ? { type: "widget", spec } : { type: "widget-pending" });
+function parseOpenPayload(tag: string, payload: string): ContentSegment | null {
+  switch (tag) {
+    case "redstone-image": {
+      const spec = parseImageGenerationSpec(payload);
+      return spec ? { type: "image", spec } : null;
+    }
+    case "redstone-flashcards": {
+      const spec = parseFlashcardDeck(payload);
+      return spec ? { type: "flashcards", spec } : null;
+    }
+    case "redstone-quiz": {
+      const spec = parseStudyQuiz(payload);
+      return spec ? { type: "quiz", spec } : null;
+    }
+    default: {
+      const spec = parseWidgetArchitectSpec(payload);
+      return spec ? { type: "widget", spec } : null;
+    }
+  }
+}
+
+function pendingSegmentForTag(tag: string): ContentSegment {
+  switch (tag) {
+    case "redstone-image":
+      return { type: "image-pending" };
+    case "redstone-flashcards":
+      return { type: "flashcards-pending" };
+    case "redstone-quiz":
+      return { type: "quiz-pending" };
+    default:
+      return { type: "widget-pending" };
+  }
 }
 
 function extractClosedBlocks(content: string): {
@@ -182,67 +260,41 @@ function finalizeOpenBlock(
   remainder: string,
   streamComplete: boolean
 ): ContentSegment[] {
-  const widgetOpen = remainder.match(WIDGET_OPEN_RE);
-  const imageOpen = remainder.match(/<redstone-image\s*>/i);
+  let earliest: {
+    tag: string;
+    openMatch: RegExpMatchArray;
+    close: RegExp;
+  } | null = null;
 
-  let openMatch: RegExpMatchArray | null = null;
-  let tag = "redstone-widget";
-  if (widgetOpen && imageOpen) {
-    if ((widgetOpen.index ?? 0) <= (imageOpen.index ?? 0)) {
-      openMatch = widgetOpen;
-      tag = "redstone-widget";
-    } else {
-      openMatch = imageOpen;
-      tag = "redstone-image";
+  for (const def of OPEN_TAG_DEFS) {
+    const openMatch = remainder.match(def.open);
+    if (!openMatch || openMatch.index === undefined) continue;
+    if (!earliest || openMatch.index < (earliest.openMatch.index ?? 0)) {
+      earliest = { tag: def.tag, openMatch, close: def.close };
     }
-  } else if (widgetOpen) {
-    openMatch = widgetOpen;
-  } else if (imageOpen) {
-    openMatch = imageOpen;
-    tag = "redstone-image";
   }
 
-  if (!openMatch || openMatch.index === undefined) {
+  if (!earliest || earliest.openMatch.index === undefined) {
     const tail = remainder.trim();
     return tail ? [{ type: "markdown", text: tail }] : [];
   }
 
-  const before = remainder.slice(0, openMatch.index).trim();
-  const afterOpen = remainder
-    .slice(openMatch.index + openMatch[0].length)
-    .trim();
+  const { tag, openMatch, close } = earliest;
+  const openIndex = openMatch.index ?? 0;
+  const before = remainder.slice(0, openIndex).trim();
+  const afterOpen = remainder.slice(openIndex + openMatch[0].length).trim();
 
   const segments: ContentSegment[] = [];
   if (before) segments.push({ type: "markdown", text: before });
 
-  const closeRe =
-    tag === "redstone-image" ? /<\/redstone-image\s*>/i : WIDGET_CLOSE_RE;
-  const closeMatch = afterOpen.match(closeRe);
+  const closeMatch = afterOpen.match(close);
   const payload = closeMatch
     ? afterOpen.slice(0, closeMatch.index).trim()
     : afterOpen;
 
-  if (tag === "redstone-image") {
-    const spec = parseImageGenerationSpec(payload);
-    if (spec) {
-      segments.push({ type: "image", spec });
-      if (closeMatch && closeMatch.index !== undefined) {
-        const tail = afterOpen
-          .slice(closeMatch.index + closeMatch[0].length)
-          .trim();
-        if (tail) segments.push({ type: "markdown", text: tail });
-      }
-      return segments;
-    }
-    if (!streamComplete) {
-      segments.push({ type: "image-pending" });
-    }
-    return segments;
-  }
-
-  const spec = parseWidgetArchitectSpec(payload);
-  if (spec) {
-    segments.push({ type: "widget", spec });
+  const parsed = parseOpenPayload(tag, payload);
+  if (parsed) {
+    segments.push(parsed);
     if (closeMatch && closeMatch.index !== undefined) {
       const tail = afterOpen
         .slice(closeMatch.index + closeMatch[0].length)
@@ -252,21 +304,11 @@ function finalizeOpenBlock(
     return segments;
   }
 
-  if (payload.length > 0 && (streamComplete || payload.length > 40)) {
-    if (streamComplete) {
-      const repaired = parseWidgetArchitectSpec(payload);
-      if (repaired) {
-        segments.push({ type: "widget", spec: repaired });
-        return segments;
-      }
-    }
-  }
-
-  if (streamComplete) {
+  if (!streamComplete) {
+    segments.push(pendingSegmentForTag(tag));
     return segments;
   }
 
-  segments.push({ type: "widget-pending" });
   return segments;
 }
 

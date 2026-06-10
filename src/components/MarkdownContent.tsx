@@ -10,6 +10,7 @@ import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
+import { ExternalLink } from "lucide-react";
 import { CodeBlock } from "@/components/CodeBlock";
 import { SourceCite } from "@/components/SourceCite";
 import { hastToText } from "@/lib/hast";
@@ -78,6 +79,28 @@ function buildComponents(
         >
           {children}
         </CodeBlock>
+      );
+    },
+    a({ href, children, ...props }) {
+      const url = typeof href === "string" ? href : "";
+      const isExternal = /^https?:\/\//i.test(url);
+      return (
+        <a
+          href={url}
+          className={
+            isExternal
+              ? "inline-link inline-flex items-center gap-0.5 text-indigo-400 underline decoration-indigo-400/40 underline-offset-2 hover:text-indigo-300"
+              : undefined
+          }
+          target={isExternal ? "_blank" : undefined}
+          rel={isExternal ? "noopener noreferrer" : undefined}
+          {...props}
+        >
+          {children}
+          {isExternal && (
+            <ExternalLink className="inline h-3 w-3 shrink-0 opacity-50" />
+          )}
+        </a>
       );
     },
     code({ className, children, ...props }) {

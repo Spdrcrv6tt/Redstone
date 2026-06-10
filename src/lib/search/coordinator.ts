@@ -35,6 +35,7 @@ export interface ImageSearchPlan {
 }
 
 export type SearchConfidence = "high" | "low";
+export type StudyMode = "flashcards" | "quiz";
 
 export interface SearchDecision {
   search: boolean;
@@ -55,6 +56,9 @@ export interface TurnPlan {
   needsWebSearch: boolean;
   needsDiagram: boolean;
   needsImageGeneration: boolean;
+  studyMode: StudyMode | null;
+  embedVideo: boolean;
+  embedLinks: boolean;
   /** User explicitly reset intent (e.g. "new topic:", "forget that"). */
   intentReset: boolean;
   /** New query is semantically unrelated to the prior thread subject. */
@@ -293,6 +297,36 @@ const DEMANDS_INTERACTIVE_DIAGRAM =
 /** User wants ComfyUI-generated art — not Brave photo search or an interactive widget. */
 const DEMANDS_GENERATED_IMAGE =
   /\b(?:generate|create|draw|paint|render|make|design)\b[\s\S]{0,48}\b(?:image|picture|photo|photograph|artwork|artistic\s+rendering|illustration)\b/i;
+
+export function demandsFlashcards(query: string): boolean {
+  return /\b(?:flash\s*cards?|flashcard deck|make (?:me )?(?:a )?deck(?: of)?|study cards?)\b/i.test(
+    query.trim()
+  );
+}
+
+export function demandsQuiz(query: string): boolean {
+  return /\b(?:quiz(?:\s+me)?|practice (?:quiz|test)|test my knowledge|multiple[- ]choice)\b/i.test(
+    query.trim()
+  );
+}
+
+export function detectStudyMode(query: string): StudyMode | null {
+  if (demandsQuiz(query)) return "quiz";
+  if (demandsFlashcards(query)) return "flashcards";
+  return null;
+}
+
+export function demandsVideoEmbed(query: string): boolean {
+  return /\b(?:(?:show|find|watch|embed)(?:\s+me)?\s+(?:a\s+)?video|youtube|video (?:about|on|for|explaining)|tutorial video)\b/i.test(
+    query.trim()
+  );
+}
+
+export function demandsLinkEmbed(query: string): boolean {
+  return /\b(?:useful links?|helpful links?|resources?|references?|further reading|related links?|source links?)\b/i.test(
+    query.trim()
+  );
+}
 
 export function demandsGeneratedImage(query: string): boolean {
   const q = query.trim();
@@ -1084,10 +1118,16 @@ export function planTurn(
     supplementalWebQueries = listQueries.slice(1);
   }
 
-  const needsDiagram = demandsInteractiveDiagram(raw);
-  const needsImageGeneration = demandsGeneratedImage(raw);
+  const studyMode = detectStudyMode(raw);
+  const needsDiagram = !studyMode && demandsInteractiveDiagram(raw);
+  const needsImageGeneration = !studyMode && demandsGeneratedImage(raw);
+  const embedVideo = studyMode !== null || demandsVideoEmbed(raw);
+  const embedLinks = studyMode !== null || demandsLinkEmbed(raw);
   const explicitVisualRequest =
-    intent === "explicit_visual" && !needsDiagram && !needsImageGeneration;
+    intent === "explicit_visual" &&
+    !needsDiagram &&
+    !needsImageGeneration &&
+    !studyMode;
 
   let searchDecision = decideWebSearch(raw, memory, intent, exhaustiveList);
   if (intentReset) {
@@ -1096,12 +1136,18 @@ export function planTurn(
       reason: "Intent reset detected",
       confidence: "high",
     };
+  } else if (studyMode) {
+    searchDecision = {
+      search: true,
+      reason: `study ${studyMode}`,
+      confidence: "high",
+    };
   }
 
   let answerStyle: AnswerStyle = "standard";
   if (exhaustiveList) {
     answerStyle = "exhaustive";
-  } else if (needsDiagram || needsImageGeneration) {
+  } else if (studyMode || needsDiagram || needsImageGeneration) {
     answerStyle = "narrative";
   } else if (NARROW_FACT.test(raw) || (PERSON_WHO.test(raw) && raw.split(/\s+/).length < 14)) {
     answerStyle = "narrow";
@@ -1117,6 +1163,7 @@ export function planTurn(
   const shouldTryImage =
     !needsDiagram &&
     !needsImageGeneration &&
+    !studyMode &&
     (explicitVisualRequest ||
       intent === "person_who" ||
       intent === "object_visual");
@@ -1159,6 +1206,9 @@ export function planTurn(
     needsWebSearch: searchDecision.search,
     needsDiagram,
     needsImageGeneration,
+    studyMode,
+    embedVideo,
+    embedLinks,
     intentReset,
     topicSwitch,
     searchDecision,

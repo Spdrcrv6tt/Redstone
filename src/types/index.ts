@@ -57,10 +57,27 @@ export interface TurnDebugMeta {
   imageMs?: number;
 }
 
+export interface SearchVideo {
+  title: string;
+  videoId: string;
+  url: string;
+  thumbnailUrl: string;
+  channelName?: string;
+}
+
+export interface SearchLink {
+  title: string;
+  url: string;
+  snippet: string;
+  domain: string;
+}
+
 export interface MessageSearchMeta {
   query: string;
   sources: SearchSource[];
   images: SearchImage[];
+  videos?: SearchVideo[];
+  links?: SearchLink[];
   searchError?: string;
   imageError?: string;
   searchDecision?: SearchDecisionMeta;

@@ -5,22 +5,32 @@ import {
   DynamicWidgetLoader,
   WidgetArchitectPending,
 } from "@/components/DynamicWidgetLoader";
+import {
+  FlashcardDeck,
+  FlashcardDeckPending,
+} from "@/components/FlashcardDeck";
 import { ImageArchitectPending, ImageLoader } from "@/components/ImageLoader";
+import { LinkCardRow } from "@/components/LinkCardRow";
 import { SearchImageLayout } from "@/components/SearchImageLayout";
+import { StudyQuiz, StudyQuizPending } from "@/components/StudyQuiz";
+import { YouTubeEmbed } from "@/components/YouTubeEmbed";
 import { parseContentSegments } from "@/lib/widget";
 import {
   inferImageLayout,
   parseImageLayout,
   splitAtImageMarker,
+  splitAtVideoMarker,
   splitLeadParagraph,
   stripImageMarkers,
   type ImageLayout,
 } from "@/lib/search/layout";
-import type { SearchImage, SearchSource } from "@/types";
+import type { SearchImage, SearchLink, SearchSource, SearchVideo } from "@/types";
 
 interface AssistantArticleProps {
   content: string;
   images: SearchImage[];
+  videos?: SearchVideo[];
+  links?: SearchLink[];
   searchSources: SearchSource[];
   previewTargetId?: string;
   streamComplete?: boolean;
@@ -32,27 +42,36 @@ interface AssistantArticleProps {
 interface MarkdownArticleBodyProps {
   content: string;
   images: SearchImage[];
+  videos: SearchVideo[];
+  links: SearchLink[];
   searchSources: SearchSource[];
   previewTargetId?: string;
   chosenLayout: ImageLayout | null;
+  showLinks: boolean;
 }
 
 function MarkdownArticleBody({
   content,
   images,
+  videos,
+  links,
   searchSources,
   previewTargetId,
   chosenLayout,
+  showLinks,
 }: MarkdownArticleBodyProps) {
   const body = stripImageMarkers(content);
   const image = images[0] ? [images[0]] : [];
   const hasImage = image.length > 0;
+  const hasVideo = videos.length > 0;
   const layout: ImageLayout =
     chosenLayout === "journal"
       ? "float-right"
       : (chosenLayout ?? inferImageLayout(image));
-  const marker = splitAtImageMarker(body);
-  const split = marker ? null : splitLeadParagraph(body);
+  const imageMarker = splitAtImageMarker(body);
+  const videoMarker = !imageMarker ? splitAtVideoMarker(body) : null;
+  const split =
+    imageMarker || videoMarker ? null : splitLeadParagraph(body);
 
   const markdown = (text: string, withPreview?: boolean) =>
     text.trim() ? (
@@ -68,12 +87,30 @@ function MarkdownArticleBody({
     <SearchImageLayout images={image} layout={layout} />
   ) : null;
 
-  if (marker && hasImage) {
+  const videoEmbed = hasVideo ? <YouTubeEmbed videos={videos} /> : null;
+  const linkRow = showLinks && links.length > 0 ? (
+    <LinkCardRow links={links} />
+  ) : null;
+
+  if (videoMarker && hasVideo) {
     return (
       <>
-        {markdown(marker.before)}
+        {markdown(videoMarker.before)}
+        {videoEmbed}
+        {markdown(videoMarker.after, true)}
+        {linkRow}
+      </>
+    );
+  }
+
+  if (imageMarker && hasImage) {
+    return (
+      <>
+        {markdown(imageMarker.before)}
         {figure}
-        {markdown(marker.after, true)}
+        {markdown(imageMarker.after, true)}
+        {hasVideo && videoEmbed}
+        {linkRow}
       </>
     );
   }
@@ -86,6 +123,8 @@ function MarkdownArticleBody({
         {split?.lead && markdown(split.lead)}
         {figure}
         {markdown(split?.body ?? (split ? "" : body), true)}
+        {hasVideo && videoEmbed}
+        {linkRow}
       </>
     );
   }
@@ -94,7 +133,9 @@ function MarkdownArticleBody({
     <>
       {split?.lead && markdown(split.lead)}
       {hasImage && <SearchImageLayout images={image} layout="full" />}
+      {hasVideo && videoEmbed}
       {markdown(split?.body ?? (split ? "" : body), true)}
+      {linkRow}
     </>
   );
 }
@@ -102,6 +143,8 @@ function MarkdownArticleBody({
 export function AssistantArticle({
   content,
   images,
+  videos = [],
+  links = [],
   searchSources,
   previewTargetId,
   streamComplete = true,
@@ -111,11 +154,16 @@ export function AssistantArticle({
 }: AssistantArticleProps) {
   const { layout: chosenLayout, content: rawBody } = parseImageLayout(content);
   const segments = parseContentSegments(rawBody, { streamComplete });
-  const hasWidget = segments.some(
-    (s) => s.type === "widget" || s.type === "widget-pending"
-  );
-  const hasGeneratedImage = segments.some(
-    (s) => s.type === "image" || s.type === "image-pending"
+  const hasRichEmbed = segments.some(
+    (s) =>
+      s.type === "widget" ||
+      s.type === "widget-pending" ||
+      s.type === "image" ||
+      s.type === "image-pending" ||
+      s.type === "flashcards" ||
+      s.type === "flashcards-pending" ||
+      s.type === "quiz" ||
+      s.type === "quiz-pending"
   );
 
   if (segments.length === 1 && segments[0].type === "markdown") {
@@ -124,9 +172,12 @@ export function AssistantArticle({
         <MarkdownArticleBody
           content={segments[0].text}
           images={images}
+          videos={videos}
+          links={links}
           searchSources={searchSources}
           previewTargetId={previewTargetId}
           chosenLayout={chosenLayout}
+          showLinks
         />
       </div>
     );
@@ -169,6 +220,18 @@ export function AssistantArticle({
         if (segment.type === "image-pending") {
           return <ImageArchitectPending key={`image-pending-${index}`} />;
         }
+        if (segment.type === "flashcards") {
+          return <FlashcardDeck key={`flashcards-${index}`} deck={segment.spec} />;
+        }
+        if (segment.type === "flashcards-pending") {
+          return <FlashcardDeckPending key={`flashcards-pending-${index}`} />;
+        }
+        if (segment.type === "quiz") {
+          return <StudyQuiz key={`quiz-${index}`} quiz={segment.spec} />;
+        }
+        if (segment.type === "quiz-pending") {
+          return <StudyQuizPending key={`quiz-pending-${index}`} />;
+        }
 
         const isFirstMarkdown = firstMarkdown;
         firstMarkdown = false;
@@ -177,12 +240,13 @@ export function AssistantArticle({
           <MarkdownArticleBody
             key={`md-${index}`}
             content={segment.text}
-            images={
-              !hasWidget && !hasGeneratedImage && isFirstMarkdown ? images : []
-            }
+            images={!hasRichEmbed && isFirstMarkdown ? images : []}
+            videos={!hasRichEmbed && isFirstMarkdown ? videos : []}
+            links={links}
             searchSources={searchSources}
             previewTargetId={previewTargetId}
             chosenLayout={isFirstMarkdown ? chosenLayout : null}
+            showLinks={isFirstMarkdown}
           />
         );
       })}

@@ -33,6 +33,7 @@ export function inferImageLayout(images: SearchImage[]): ImageLayout {
 }
 
 const IMG_HERE_RE = /<img-here\s*\/?>/i;
+const VIDEO_HERE_RE = /<video-here\s*\/?>/i;
 
 /** Model places this before the paragraph the image should accompany. */
 export function splitAtImageMarker(content: string): {
@@ -49,7 +50,24 @@ export function splitAtImageMarker(content: string): {
 }
 
 export function stripImageMarkers(content: string): string {
-  return content.replace(/<img-here\s*\/?>/gi, "").trim();
+  return content
+    .replace(/<img-here\s*\/?>/gi, "")
+    .replace(/<video-here\s*\/?>/gi, "")
+    .trim();
+}
+
+/** Model places this before the paragraph a YouTube embed should accompany. */
+export function splitAtVideoMarker(content: string): {
+  before: string;
+  after: string;
+} | null {
+  const match = content.match(VIDEO_HERE_RE);
+  if (!match || match.index === undefined) return null;
+
+  return {
+    before: content.slice(0, match.index).replace(VIDEO_HERE_RE, "").trim(),
+    after: content.slice(match.index + match[0].length).trim(),
+  };
 }
 
 /** Opening paragraph for float layouts — body text wraps beside the figure. */

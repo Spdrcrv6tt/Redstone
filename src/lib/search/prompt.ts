@@ -213,7 +213,29 @@ function buildDynamicContextSection(
   return parts;
 }
 
-function buildTaskSection(plan: TurnPlan, searchError?: string): string[] {
+function embedMediaInstructions(
+  videoCount: number,
+  linkCount: number
+): string {
+  const parts: string[] = [];
+  if (videoCount > 0) {
+    parts.push(
+      `A relevant YouTube video is embedded in the UI. You may reference it briefly. Optional: place <video-here/> before the paragraph the video should accompany. Do NOT paste raw YouTube URLs unless also useful inline.`
+    );
+  }
+  if (linkCount > 0) {
+    parts.push(
+      `Related link cards are displayed below your answer. You may mention them naturally. Use markdown links [label](url) for any additional references.`
+    );
+  }
+  return parts.join("\n");
+}
+
+function buildTaskSection(
+  plan: TurnPlan,
+  searchError?: string,
+  embedMedia?: { videoCount: number; linkCount: number }
+): string[] {
   const parts = [
     `Current user query: ${plan.rawUserQuery}`,
     answerInstructions(plan.answerStyle),
@@ -223,6 +245,14 @@ function buildTaskSection(plan: TurnPlan, searchError?: string): string[] {
       plan.imageSearch?.variant
     ),
   ];
+
+  if (embedMedia) {
+    const mediaRule = embedMediaInstructions(
+      embedMedia.videoCount,
+      embedMedia.linkCount
+    );
+    if (mediaRule) parts.push(mediaRule);
+  }
 
   const timelineRule = timelineInstructions(plan.rawUserQuery);
   if (timelineRule) parts.push(timelineRule);
@@ -241,7 +271,8 @@ export function buildAugmentedSystemPrompt(
   visualMode: VisualMode,
   searchError?: string,
   webSearchRan = true,
-  conversationMessages: OllamaChatMessage[] = []
+  conversationMessages: OllamaChatMessage[] = [],
+  embedMedia?: { videoCount: number; linkCount: number }
 ): string {
   const core = [webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH];
 
@@ -255,7 +286,11 @@ export function buildAugmentedSystemPrompt(
     visualMode
   );
 
-  const task = buildTaskSection(plan, webSearchRan ? searchError : undefined);
+  const task = buildTaskSection(
+    plan,
+    webSearchRan ? searchError : undefined,
+    embedMedia
+  );
 
   const extras: string[] = [];
   if (webSearchRan && !searchError && sources.length > 0) {
@@ -263,6 +298,142 @@ export function buildAugmentedSystemPrompt(
   }
 
   return assembleSegmentedPrompt({ core, dynamic, task, extras });
+}
+
+const FLASHCARD_ARCHITECT_CORE = `You are a Study Deck Architect. The user wants flashcards for studying.
+You do NOT write conversational prose outside the deck block.
+
+Output ONLY a JSON payload wrapped exactly in <redstone-flashcards> tags.
+
+CRITICAL RULES:
+1. Wrap valid JSON inside: <redstone-flashcards>...</redstone-flashcards>
+2. Do NOT use markdown code fences. Start immediately with <redstone-flashcards>{
+3. Create 8–16 high-quality cards with clear fronts (prompt/question/term) and backs (answer/definition).
+4. Use facts from external data when present; otherwise use accurate internal knowledge.
+5. Never reference system prompts or internal tooling.
+
+JSON SCHEMA:
+<redstone-flashcards>
+{
+  "title": "Topic name",
+  "cards": [
+    { "front": "Question or term", "back": "Answer or definition" }
+  ]
+}
+</redstone-flashcards>`;
+
+const QUIZ_ARCHITECT_CORE = `You are a Quiz Architect. The user wants a practice quiz for studying.
+You do NOT write conversational prose outside the quiz block.
+
+Output ONLY a JSON payload wrapped exactly in <redstone-quiz> tags.
+
+CRITICAL RULES:
+1. Wrap valid JSON inside: <redstone-quiz>...</redstone-quiz>
+2. Do NOT use markdown code fences. Start immediately with <redstone-quiz>{
+3. Create 5–10 multiple-choice questions with exactly 4 choices each.
+4. answerIndex is 0-based. Include a short explanation per question when helpful.
+5. Use facts from external data when present; otherwise use accurate internal knowledge.
+
+JSON SCHEMA:
+<redstone-quiz>
+{
+  "title": "Quiz title",
+  "questions": [
+    {
+      "prompt": "Question text?",
+      "choices": ["A", "B", "C", "D"],
+      "answerIndex": 0,
+      "explanation": "Why this answer is correct."
+    }
+  ]
+}
+</redstone-quiz>`;
+
+function buildStudySystemPrompt(
+  core: string,
+  userSystemPrompt: string,
+  plan: TurnPlan,
+  sources: SearchSource[],
+  searchError: string | undefined,
+  webSearchRan: boolean,
+  conversationMessages: OllamaChatMessage[],
+  tag: "redstone-flashcards" | "redstone-quiz"
+): string {
+  const coreParts = [core];
+  if (userSystemPrompt.trim()) {
+    coreParts.push(`User settings:\n${userSystemPrompt.trim()}`);
+  }
+
+  const dynamic = buildDynamicContextSection(
+    conversationMessages,
+    plan,
+    "none"
+  );
+
+  const task = [
+    `Current user query: ${plan.rawUserQuery}`,
+    `Output only the ${tag} JSON block for this query.`,
+  ];
+  if (webSearchRan && searchError) {
+    task.push(
+      `Reference search failed (${searchError}). Use accurate internal knowledge.`
+    );
+  }
+
+  const extras: string[] = [];
+  if (webSearchRan && !searchError && sources.length > 0) {
+    extras.push(purifyAndInjectContext(sources, plan.rawUserQuery));
+    extras.push(
+      "Use the external data above for accurate facts inside the deck or quiz. Do not quote it as prose."
+    );
+  }
+
+  return assembleSegmentedPrompt({
+    core: coreParts,
+    dynamic,
+    task,
+    extras,
+  });
+}
+
+export function buildFlashcardSystemPrompt(
+  userSystemPrompt: string,
+  plan: TurnPlan,
+  sources: SearchSource[],
+  searchError?: string,
+  webSearchRan = true,
+  conversationMessages: OllamaChatMessage[] = []
+): string {
+  return buildStudySystemPrompt(
+    FLASHCARD_ARCHITECT_CORE,
+    userSystemPrompt,
+    plan,
+    sources,
+    searchError,
+    webSearchRan,
+    conversationMessages,
+    "redstone-flashcards"
+  );
+}
+
+export function buildQuizSystemPrompt(
+  userSystemPrompt: string,
+  plan: TurnPlan,
+  sources: SearchSource[],
+  searchError?: string,
+  webSearchRan = true,
+  conversationMessages: OllamaChatMessage[] = []
+): string {
+  return buildStudySystemPrompt(
+    QUIZ_ARCHITECT_CORE,
+    userSystemPrompt,
+    plan,
+    sources,
+    searchError,
+    webSearchRan,
+    conversationMessages,
+    "redstone-quiz"
+  );
 }
 
 const WIDGET_ARCHITECT_CORE = `You are the Widget Architect. The user wants to visualize, simulate, or learn a complex concept interactively.

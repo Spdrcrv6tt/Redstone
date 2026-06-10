@@ -1,5 +1,6 @@
 import { stripDiagramBlocks } from "@/lib/diagram";
 import { protectImageBlocks, stripImageBlocks } from "@/lib/image-gen";
+import { protectStudyBlocks, stripStudyBlocks } from "@/lib/study";
 import { protectWidgetBlocks, stripWidgetBlocks } from "@/lib/widget";
 import { stripImageLayoutTag } from "@/lib/search/layout";
 
@@ -95,9 +96,12 @@ export function thinCitations(text: string, maxTotal = 2): string {
 export function cleanSearchResponse(text: string): string {
   const { text: widgetShielded, restore: restoreWidgets } =
     protectWidgetBlocks(text);
-  const { text: shielded, restore: restoreImages } =
+  const { text: imageShielded, restore: restoreImages } =
     protectImageBlocks(widgetShielded);
-  const restore = (cleaned: string) => restoreWidgets(restoreImages(cleaned));
+  const { text: shielded, restore: restoreStudy } =
+    protectStudyBlocks(imageShielded);
+  const restore = (cleaned: string) =>
+    restoreWidgets(restoreImages(restoreStudy(cleaned)));
 
   let result = stripInlineCitations(shielded);
   result = stripHallucinatedCiteBrackets(result);
@@ -112,10 +116,12 @@ export function cleanSearchResponse(text: string): string {
 
 /** Plain prose for clipboard — no cite tags or legacy markers. */
 export function plainSearchResponse(text: string): string {
-  let t = stripImageBlocks(
-    stripWidgetBlocks(
-      stripDiagramBlocks(
-        stripImageLayoutTag(stripCiteTags(cleanSearchResponse(text)))
+  let t = stripStudyBlocks(
+    stripImageBlocks(
+      stripWidgetBlocks(
+        stripDiagramBlocks(
+          stripImageLayoutTag(stripCiteTags(cleanSearchResponse(text)))
+        )
       )
     )
   );

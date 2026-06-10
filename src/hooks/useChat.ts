@@ -56,11 +56,13 @@ async function streamResponse(
     query: "",
     sources: [],
     images: [],
+    videos: [],
+    links: [],
     searchError: undefined,
   };
 
   updateMessage(conversationId, assistantId, {
-    search: { query: "", sources: [], images: [] },
+    search: { query: "", sources: [], images: [], videos: [], links: [] },
     agentStatus: undefined,
   });
 

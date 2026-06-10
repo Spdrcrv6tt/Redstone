@@ -14,9 +14,16 @@ import {
 import { enhanceSearchQuery } from "@/lib/search/query-enhance";
 import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
 import {
+  pickEmbedLinks,
+  searchYouTubeVideos,
+  videosFromSources,
+} from "@/lib/search/embed-media";
+import {
   buildAugmentedSystemPrompt,
   buildDiagramSystemPrompt,
+  buildFlashcardSystemPrompt,
   buildImageGenerationSystemPrompt,
+  buildQuizSystemPrompt,
 } from "@/lib/search/prompt";
 import {
   encodeMetaLine,
@@ -133,7 +140,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     !!imagePlanEarly &&
     !!braveKey &&
     !draftPlan.needsDiagram &&
-    !draftPlan.needsImageGeneration;
+    !draftPlan.needsImageGeneration &&
+    !draftPlan.studyMode;
 
   if (runWebSearch && !braveKey) {
     searchError = "Brave Search API key is not configured";
@@ -229,28 +237,47 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     priorImageUrls
   );
 
+  let videos: AgentStreamMeta["videos"] = [];
+  let links: AgentStreamMeta["links"] = [];
+
+  if (sources.length && turnPlan.embedVideo) {
+    videos = videosFromSources(sources);
+    if (!videos.length && braveKey) {
+      try {
+        videos = await searchYouTubeVideos(
+          finalSearchQuery || rawUserQuery,
+          braveKey
+        );
+      } catch {
+        /* optional YouTube search */
+      }
+    }
+  }
+
+  if (sources.length && turnPlan.embedLinks) {
+    links = pickEmbedLinks(sources, {
+      excludeUrls: videos?.map((v) => v.url) ?? [],
+    });
+  }
+
   const visualMode = finalizeVisualMode(turnPlan, images.length);
 
   emitStatus(
     "injecting",
-    turnPlan.needsDiagram
-      ? "Preparing widget architect prompt..."
-      : turnPlan.needsImageGeneration
-        ? "Preparing image prompt engineer..."
-        : "Purifying and binding verified context..."
+    turnPlan.studyMode === "flashcards"
+      ? "Preparing flashcard deck..."
+      : turnPlan.studyMode === "quiz"
+        ? "Preparing practice quiz..."
+        : turnPlan.needsDiagram
+          ? "Preparing widget architect prompt..."
+          : turnPlan.needsImageGeneration
+            ? "Preparing image prompt engineer..."
+            : "Purifying and binding verified context..."
   );
 
-  const systemContent = turnPlan.needsDiagram
-    ? buildDiagramSystemPrompt(
-        userSystemPrompt,
-        turnPlan,
-        sources,
-        searchError,
-        runWebSearch,
-        conversationMessages
-      )
-    : turnPlan.needsImageGeneration
-      ? buildImageGenerationSystemPrompt(
+  const systemContent =
+    turnPlan.studyMode === "flashcards"
+      ? buildFlashcardSystemPrompt(
           userSystemPrompt,
           turnPlan,
           sources,
@@ -258,15 +285,46 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
           runWebSearch,
           conversationMessages
         )
-      : buildAugmentedSystemPrompt(
-          userSystemPrompt,
-          turnPlan,
-          sources,
-          visualMode,
-          searchError,
-          runWebSearch,
-          conversationMessages
-        );
+      : turnPlan.studyMode === "quiz"
+        ? buildQuizSystemPrompt(
+            userSystemPrompt,
+            turnPlan,
+            sources,
+            searchError,
+            runWebSearch,
+            conversationMessages
+          )
+        : turnPlan.needsDiagram
+          ? buildDiagramSystemPrompt(
+              userSystemPrompt,
+              turnPlan,
+              sources,
+              searchError,
+              runWebSearch,
+              conversationMessages
+            )
+          : turnPlan.needsImageGeneration
+            ? buildImageGenerationSystemPrompt(
+                userSystemPrompt,
+                turnPlan,
+                sources,
+                searchError,
+                runWebSearch,
+                conversationMessages
+              )
+            : buildAugmentedSystemPrompt(
+                userSystemPrompt,
+                turnPlan,
+                sources,
+                visualMode,
+                searchError,
+                runWebSearch,
+                conversationMessages,
+                {
+                  videoCount: videos?.length ?? 0,
+                  linkCount: links?.length ?? 0,
+                }
+              );
 
   const upstreamMessages: OllamaChatMessage[] = [
     { role: "system", content: systemContent },
@@ -276,6 +334,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   const meta: AgentStreamMeta = {
     sources,
     images,
+    videos,
+    links,
     query: runWebSearch ? finalSearchQuery : "",
     searchDecision: {
       ran: runWebSearch,
