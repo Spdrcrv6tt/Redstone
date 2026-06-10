@@ -49,15 +49,20 @@ export function ImageLoader({
           if (!cancelled) setStatus("Generating image...");
         }, 2500);
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 9 * 60 * 1000);
+
         const res = await fetch("/api/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             positive_prompt: spec.positive_prompt,
             negative_prompt: spec.negative_prompt,
             model,
           }),
         });
+        clearTimeout(timeout);
 
         const data = (await res.json()) as { url?: string; error?: string };
         if (!res.ok) {
@@ -78,9 +83,13 @@ export function ImageLoader({
         }, 1500);
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Generation failed."
-          );
+          const message =
+            err instanceof DOMException && err.name === "AbortError"
+              ? "Generation timed out — ComfyUI may be stalled on VRAM. Close other GPU apps and try again."
+              : err instanceof Error
+                ? err.message
+                : "Generation failed.";
+          setError(message);
           setStatus("Generation failed.");
         }
       }
