@@ -3,13 +3,53 @@ export type DiagramSegment =
   | { type: "diagram"; html: string }
   | { type: "diagram-pending" };
 
+const DIAGRAM_OPEN_RE = /<redstone-diagram\s*>/i;
+const DIAGRAM_CLOSE_RE = /<\/redstone-diagram\s*>/i;
 const DIAGRAM_BLOCK_RE =
-  /<redstone-diagram>([\s\S]*?)<\/redstone-diagram>/gi;
+  /<redstone-diagram\s*>([\s\S]*?)<\/redstone-diagram\s*>/gi;
 
-const OPEN_DIAGRAM_RE = /<redstone-diagram>/i;
+const DIAGRAM_PLACEHOLDER_PREFIX = "\u0000REDSTONE_DIAGRAM_";
+const DIAGRAM_PLACEHOLDER_SUFFIX = "\u0000";
 
-/** Split assistant content into markdown and diagram segments. */
-export function parseDiagramSegments(content: string): DiagramSegment[] {
+/** Shield diagram payloads from prose cleaners that strip bracketed tokens. */
+export function protectDiagramBlocks(text: string): {
+  text: string;
+  restore: (cleaned: string) => string;
+} {
+  const blocks: string[] = [];
+  const shielded = text.replace(
+    /<redstone-diagram\s*>[\s\S]*?(?:<\/redstone-diagram\s*>|$)/gi,
+    (match) => {
+      const id = blocks.length;
+      blocks.push(match);
+      return `${DIAGRAM_PLACEHOLDER_PREFIX}${id}${DIAGRAM_PLACEHOLDER_SUFFIX}`;
+    }
+  );
+
+  return {
+    text: shielded,
+    restore: (cleaned: string) =>
+      cleaned.replace(
+        /\u0000REDSTONE_DIAGRAM_(\d+)\u0000/g,
+        (_, index) => blocks[Number(index)] ?? ""
+      ),
+  };
+}
+
+/** Unwrap a markdown html fence when the model ignores the no-fence rule. */
+export function unwrapDiagramFences(content: string): string {
+  const trimmed = content.trim();
+  const match = trimmed.match(/^```(?:html)?\s*\n([\s\S]*?)\n```\s*$/i);
+  if (match && DIAGRAM_OPEN_RE.test(match[1])) {
+    return match[1].trim();
+  }
+  return content;
+}
+
+function extractClosedDiagrams(content: string): {
+  segments: DiagramSegment[];
+  remainder: string;
+} {
   const segments: DiagramSegment[] = [];
   let lastIndex = 0;
 
@@ -23,27 +63,72 @@ export function parseDiagramSegments(content: string): DiagramSegment[] {
     lastIndex = index + match[0].length;
   }
 
-  const remainder = content.slice(lastIndex);
-  const openIdx = remainder.search(OPEN_DIAGRAM_RE);
+  return { segments, remainder: content.slice(lastIndex) };
+}
 
-  if (openIdx !== -1) {
-    const before = remainder.slice(0, openIdx).trim();
-    if (before) segments.push({ type: "markdown", text: before });
-    segments.push({ type: "diagram-pending" });
+function finalizeOpenDiagram(
+  remainder: string,
+  streamComplete: boolean
+): DiagramSegment[] {
+  const openMatch = remainder.match(DIAGRAM_OPEN_RE);
+  if (!openMatch || openMatch.index === undefined) {
+    const tail = remainder.trim();
+    return tail ? [{ type: "markdown", text: tail }] : [];
+  }
+
+  const before = remainder.slice(0, openMatch.index).trim();
+  const afterOpen = remainder
+    .slice(openMatch.index + openMatch[0].length)
+    .trim();
+
+  const segments: DiagramSegment[] = [];
+  if (before) segments.push({ type: "markdown", text: before });
+
+  const closeMatch = afterOpen.match(DIAGRAM_CLOSE_RE);
+  if (closeMatch && closeMatch.index !== undefined) {
+    const html = afterOpen.slice(0, closeMatch.index).trim();
+    if (html) segments.push({ type: "diagram", html });
+    const tail = afterOpen
+      .slice(closeMatch.index + closeMatch[0].length)
+      .trim();
+    if (tail) segments.push({ type: "markdown", text: tail });
     return segments;
   }
 
-  const tail = remainder.trim();
-  if (tail) segments.push({ type: "markdown", text: tail });
+  if (afterOpen.length > 0 && (streamComplete || afterOpen.length > 120)) {
+    segments.push({ type: "diagram", html: afterOpen });
+    return segments;
+  }
 
-  return segments.length ? segments : [{ type: "markdown", text: content }];
+  if (streamComplete) {
+    return segments;
+  }
+
+  segments.push({ type: "diagram-pending" });
+  return segments;
+}
+
+/** Split assistant content into markdown and diagram segments. */
+export function parseDiagramSegments(
+  content: string,
+  options: { streamComplete?: boolean } = {}
+): DiagramSegment[] {
+  const prepared = unwrapDiagramFences(content);
+  const { segments, remainder } = extractClosedDiagrams(prepared);
+  const tailSegments = finalizeOpenDiagram(
+    remainder,
+    options.streamComplete === true
+  );
+
+  const merged = [...segments, ...tailSegments];
+  return merged.length ? merged : [{ type: "markdown", text: prepared }];
 }
 
 /** Remove diagram blocks for plain-text copy. */
 export function stripDiagramBlocks(text: string): string {
   return text
     .replace(DIAGRAM_BLOCK_RE, "\n[interactive diagram]\n")
-    .replace(/<redstone-diagram>[\s\S]*$/i, "")
+    .replace(/<redstone-diagram\s*>[\s\S]*$/i, "")
     .trim();
 }
 

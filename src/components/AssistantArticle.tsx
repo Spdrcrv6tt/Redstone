@@ -19,6 +19,8 @@ interface AssistantArticleProps {
   images: SearchImage[];
   searchSources: SearchSource[];
   previewTargetId?: string;
+  /** When true, an unclosed <redstone-diagram> is treated as complete. */
+  streamComplete?: boolean;
 }
 
 interface MarkdownArticleBodyProps {
@@ -96,9 +98,10 @@ export function AssistantArticle({
   images,
   searchSources,
   previewTargetId,
+  streamComplete = true,
 }: AssistantArticleProps) {
   const { layout: chosenLayout, content: rawBody } = parseImageLayout(content);
-  const segments = parseDiagramSegments(rawBody);
+  const segments = parseDiagramSegments(rawBody, { streamComplete });
   const hasDiagram = segments.some(
     (s) => s.type === "diagram" || s.type === "diagram-pending"
   );

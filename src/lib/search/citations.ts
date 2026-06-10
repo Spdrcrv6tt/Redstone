@@ -1,4 +1,4 @@
-import { stripDiagramBlocks } from "@/lib/diagram";
+import { protectDiagramBlocks, stripDiagramBlocks } from "@/lib/diagram";
 import { stripImageLayoutTag } from "@/lib/search/layout";
 
 /** Remove bracketed source markers like [1], [2, 3] from model output. */
@@ -91,14 +91,17 @@ export function thinCitations(text: string, maxTotal = 2): string {
 }
 
 export function cleanSearchResponse(text: string): string {
-  let result = stripInlineCitations(text);
+  const { text: shielded, restore } = protectDiagramBlocks(text);
+
+  let result = stripInlineCitations(shielded);
   result = stripHallucinatedCiteBrackets(result);
   result = collapseAdjacentCites(result);
   result = thinCitations(result);
   result = stripImageAcknowledgments(result);
   result = stripNamesakeDisambiguation(result);
   result = stripPhotoCatalogue(result);
-  return result;
+
+  return restore(result);
 }
 
 /** Plain prose for clipboard — no cite tags or legacy markers. */
