@@ -37,7 +37,7 @@
   --btn-send: #1f1f1f;
   --btn-send-hover: #333333;
   --btn-send-text: #ffffff;
-  --sidebar-bg: #e9eef6;
+  --sidebar-bg: #e4eaf3;
   --sidebar-border: rgba(0, 0, 0, 0.06);
   --composer-border: rgba(0, 0, 0, 0.08);
   --modal-shadow: 0 24px 80px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.06);
@@ -99,7 +99,7 @@
   --btn-send: #f0f0f2;
   --btn-send-hover: #e4e4e7;
   --btn-send-text: #09090c;
-  --sidebar-bg: rgba(255, 255, 255, 0.03);
+  --sidebar-bg: #0b0b0e;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --composer-border: rgba(255, 255, 255, 0.1);
   --modal-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -131,7 +131,7 @@
 @layer base {
   html, body {
     height: 100%;
-    background-color: transparent;
+    background-color: var(--bg-base);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -157,23 +157,64 @@
 
 @keyframes aurora-drift {
   0%, 100% {
-    background-position: 0% 50%, 100% 50%, 50% 0%;
-    filter: hue-rotate(0deg);
+    background-position: 0% 40%, 100% 60%, 50% 20%;
+    transform: scale(1) translate(0, 0);
   }
-  33% {
-    background-position: 30% 70%, 70% 30%, 80% 20%;
-    filter: hue-rotate(15deg);
+  20% {
+    background-position: 25% 55%, 75% 35%, 65% 15%;
+    transform: scale(1.03) translate(1%, -0.5%);
   }
-  66% {
-    background-position: 70% 30%, 20% 80%, 10% 60%;
-    filter: hue-rotate(-10deg);
+  40% {
+    background-position: 55% 30%, 30% 70%, 85% 40%;
+    transform: scale(1.05) translate(-1%, 0.5%);
+  }
+  60% {
+    background-position: 70% 65%, 15% 25%, 20% 55%;
+    transform: scale(1.02) translate(0.5%, 1%);
+  }
+  80% {
+    background-position: 35% 20%, 90% 50%, 45% 75%;
+    transform: scale(1.04) translate(-0.5%, -0.5%);
+  }
+}
+
+@keyframes gemini-sky-shift {
+  0%, 100% {
+    filter: hue-rotate(0deg) saturate(1);
+    opacity: 1;
+  }
+  25% {
+    filter: hue-rotate(18deg) saturate(1.08);
+    opacity: 0.92;
+  }
+  50% {
+    filter: hue-rotate(-12deg) saturate(0.96);
+    opacity: 1;
+  }
+  75% {
+    filter: hue-rotate(28deg) saturate(1.05);
+    opacity: 0.94;
   }
 }
 
 @keyframes orb-color-1 {
   0%, 100% { background: var(--orb-1); }
-  33%       { background: color-mix(in srgb, var(--orb-1) 70%, rgba(167,139,250,0.5) 30%); }
-  66%       { background: color-mix(in srgb, var(--orb-1) 70%, rgba(125,211,252,0.4) 30%); }
+  25% { background: color-mix(in srgb, var(--orb-1) 55%, rgba(167, 139, 250, 0.55) 45%); }
+  50% { background: color-mix(in srgb, var(--orb-1) 50%, rgba(125, 211, 252, 0.45) 50%); }
+  75% { background: color-mix(in srgb, var(--orb-1) 60%, rgba(192, 132, 252, 0.4) 40%); }
+}
+
+@keyframes orb-color-2 {
+  0%, 100% { background: var(--orb-2); }
+  30% { background: color-mix(in srgb, var(--orb-2) 50%, rgba(56, 189, 248, 0.5) 50%); }
+  55% { background: color-mix(in srgb, var(--orb-2) 55%, rgba(129, 140, 248, 0.45) 45%); }
+  80% { background: color-mix(in srgb, var(--orb-2) 50%, rgba(45, 212, 191, 0.4) 50%); }
+}
+
+@keyframes orb-color-3 {
+  0%, 100% { background: var(--orb-3); }
+  35% { background: color-mix(in srgb, var(--orb-3) 55%, rgba(168, 85, 247, 0.45) 45%); }
+  65% { background: color-mix(in srgb, var(--orb-3) 50%, rgba(59, 130, 246, 0.4) 50%); }
 }
 
 @keyframes ray-sweep-1 {
@@ -210,22 +251,46 @@
   40%           { opacity: 1; transform: scale(1); }
 }
 
-/* ─── Ambient layers ─────────────────────────────────────────────────────── */
-.ambient-base { background: var(--bg-base); transition: background 0.5s ease; }
+/* ─── Ambient layers (main column only, behind UI) ───────────────────────── */
+.ambient-base {
+  background: var(--bg-base);
+  transition: background 0.5s ease;
+}
 
 .ambient-bg {
   z-index: 0;
 }
 
+.ambient-aurora-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 42%,
+    rgba(0, 0, 0, 0.55) 62%,
+    transparent 88%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 42%,
+    rgba(0, 0, 0, 0.55) 62%,
+    transparent 88%
+  );
+  pointer-events: none;
+}
+
 /* Gemini-style top curtain — visible on new chat only */
 .ambient-gemini-sky {
-  height: min(52vh, 480px);
   pointer-events: none;
   background:
     radial-gradient(ellipse 140% 100% at 50% -20%, var(--gemini-sky-a) 0%, transparent 70%),
     radial-gradient(ellipse 100% 80% at 8% 0%, var(--gemini-sky-b) 0%, transparent 66%),
     radial-gradient(ellipse 90% 75% at 92% 2%, var(--gemini-sky-c) 0%, transparent 64%),
-    linear-gradient(180deg, color-mix(in srgb, var(--gemini-sky-a) 18%, transparent) 0%, transparent 55%, var(--bg-base) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--gemini-sky-a) 18%, transparent) 0%, transparent 72%, var(--bg-base) 100%);
+}
+
+.ambient-gemini-sky-animate {
+  animation: gemini-sky-shift 28s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
 }
 
 .ambient-aurora {
@@ -234,26 +299,35 @@
     radial-gradient(ellipse 50% 60% at 80% 60%, var(--aurora-b) 0%, transparent 65%),
     radial-gradient(ellipse 40% 40% at 50% 80%, var(--aurora-c) 0%, transparent 60%);
   background-size: 200% 200%, 180% 180%, 160% 160%;
-  animation: aurora-drift 24s ease-in-out infinite;
+}
+
+.ambient-aurora-animate {
+  animation: aurora-drift 32s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
 }
 
 .ambient-orb {
-  filter: blur(60px);
-  animation: orb-color-1 18s ease-in-out infinite;
+  filter: blur(64px);
+  opacity: 0.85;
 }
 .ambient-orb-1 {
   background: var(--orb-1);
-  animation: breathe 14s ease-in-out infinite, orb-color-1 20s ease-in-out infinite;
+  animation:
+    breathe 16s cubic-bezier(0.45, 0.05, 0.25, 1) infinite,
+    orb-color-1 24s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
 }
 .ambient-orb-2 {
   background: var(--orb-2);
-  animation: breathe-alt 18s ease-in-out infinite;
-  animation-delay: -6s;
+  animation:
+    breathe-alt 20s cubic-bezier(0.45, 0.05, 0.25, 1) infinite,
+    orb-color-2 26s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation-delay: -7s, -4s;
 }
 .ambient-orb-3 {
   background: var(--orb-3);
-  animation: breathe-slow 22s ease-in-out infinite;
-  animation-delay: -10s;
+  animation:
+    breathe-slow 24s cubic-bezier(0.45, 0.05, 0.25, 1) infinite,
+    orb-color-3 30s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation-delay: -12s, -9s;
 }
 
 .ambient-ray {
@@ -386,14 +460,23 @@
 
 .app-shell {
   position: relative;
-  z-index: 1;
   min-height: 100dvh;
   min-height: 100vh;
-  background: transparent;
+  background: var(--bg-base);
 }
 
 .app-main {
   background: transparent;
+}
+
+.app-main--chat {
+  background: var(--bg-base);
+  transition: background-color 0.5s ease;
+}
+
+.app-main-stack {
+  position: relative;
+  z-index: 10;
 }
 
 .mobile-top-bar {

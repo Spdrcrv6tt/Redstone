@@ -112,7 +112,6 @@ export default function Home() {
   return (
     <>
       <AppBootstrap />
-      <AmbientBackground active={showAurora} />
 
       <LayoutGroup id="chat-shell">
         <div className="app-shell flex h-dvh overflow-hidden">
@@ -122,18 +121,28 @@ export default function Home() {
             onMobileClose={() => setMobileNavOpen(false)}
           />
 
-          <main className="app-main flex flex-col flex-1 min-w-0 relative">
-            <MobileTopBar
-              onOpenMenu={() => setMobileNavOpen(true)}
-              onNewChat={handleNewChat}
-            />
+          <main
+            className={[
+              "app-main flex flex-col flex-1 min-w-0 relative isolate overflow-hidden",
+              isChat ? "app-main--chat" : "",
+            ].join(" ")}
+          >
+            <AnimatePresence>
+              {showAurora ? <AmbientBackground key="aurora" /> : null}
+            </AnimatePresence>
 
-            <div
-              className={[
-                "flex-1 flex flex-col min-h-0",
-                !isChat ? "landing-shell" : "",
-              ].join(" ")}
-            >
+            <div className="app-main-stack relative z-10 flex flex-col flex-1 min-h-0 min-w-0">
+              <MobileTopBar
+                onOpenMenu={() => setMobileNavOpen(true)}
+                onNewChat={handleNewChat}
+              />
+
+              <div
+                className={[
+                  "flex-1 flex flex-col min-h-0",
+                  !isChat ? "landing-shell" : "",
+                ].join(" ")}
+              >
               {isChat && (
                 <motion.div
                   className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
@@ -182,6 +191,7 @@ export default function Home() {
                   onDraftChange={handleDraftChange}
                 />
               </motion.div>
+              </div>
             </div>
           </main>
         </div>
