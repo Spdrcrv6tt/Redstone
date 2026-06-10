@@ -5,7 +5,11 @@ const COMFY_QUEUE_TIMEOUT_MS = 30_000;
 const COMFY_HISTORY_POLL_MS = 2000;
 const COMFY_GENERATION_TIMEOUT_MS = 8 * 60 * 1000;
 const COMFY_STALL_MS = 3 * 60 * 1000;
-const POST_COMFY_WARM_DELAY_MS = 4000;
+/** Only used when VRAM_JUGGLER_AUTO_WARM=true — long delay so ComfyUI keeps full VRAM. */
+const POST_COMFY_WARM_DELAY_MS = 60_000;
+
+let generationActive = false;
+let pendingWarmTimer: ReturnType<typeof setTimeout> | null = null;
 
 interface OllamaPsModel {
   name: string;
@@ -34,9 +38,29 @@ interface ComfyHistoryEntry {
 
 let generationChain: Promise<void> = Promise.resolve();
 
+export function isGenerationActive(): boolean {
+  return generationActive;
+}
+
+/** Cancel any scheduled Ollama preload — call before evicting VRAM. */
+export function cancelPendingLlmWarm(): void {
+  if (pendingWarmTimer) {
+    clearTimeout(pendingWarmTimer);
+    pendingWarmTimer = null;
+  }
+}
+
 /** Serialize image generations so two jobs never fight for VRAM. */
 export async function withGenerationLock<T>(fn: () => Promise<T>): Promise<T> {
-  const run = generationChain.then(fn);
+  const run = generationChain.then(async () => {
+    generationActive = true;
+    cancelPendingLlmWarm();
+    try {
+      return await fn();
+    } finally {
+      generationActive = false;
+    }
+  });
   generationChain = run.then(
     () => undefined,
     () => undefined
@@ -95,13 +119,41 @@ export async function waitForOllamaUnload(
   return (await listLoadedOllamaModels(ollamaUrl)).length === 0;
 }
 
-export async function warmLlmInVram(
+/**
+ * Optionally preload the chat LLM after image generation.
+ * Disabled by default — ComfyUI keeps diffusion weights resident, so preloading
+ * Gemma competes for VRAM and slows sampling. Ollama loads lazily on next chat.
+ */
+export function scheduleLlmWarm(
   ollamaUrl: string,
   model: string,
-  delayMs = POST_COMFY_WARM_DELAY_MS
+  comfyUrl?: string
+): void {
+  if (process.env.VRAM_JUGGLER_AUTO_WARM !== "true") return;
+
+  cancelPendingLlmWarm();
+  pendingWarmTimer = setTimeout(() => {
+    pendingWarmTimer = null;
+    void runLlmWarmIfSafe(ollamaUrl, model, comfyUrl);
+  }, POST_COMFY_WARM_DELAY_MS);
+}
+
+async function runLlmWarmIfSafe(
+  ollamaUrl: string,
+  model: string,
+  comfyUrl?: string
 ): Promise<void> {
-  if (delayMs > 0) await sleep(delayMs);
-  fetch(`${ollamaUrl}/api/generate`, {
+  if (generationActive) return;
+
+  if (comfyUrl) {
+    const idle = await waitForComfyQueueIdle(comfyUrl, 5000);
+    if (!idle || generationActive) return;
+  }
+
+  const loaded = await listLoadedOllamaModels(ollamaUrl);
+  if (loaded.length > 0 || generationActive) return;
+
+  await fetch(`${ollamaUrl}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, prompt: " ", keep_alive: "1h" }),

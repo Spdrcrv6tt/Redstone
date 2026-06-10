@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { SERVER_OLLAMA_HOST, CORS_HEADERS } from "@/lib/proxy";
 import { getComfyUIWorkflow } from "@/lib/comfy-workflow";
 import {
+  cancelPendingLlmWarm,
   evictAllOllamaModels,
   pollComfyCompletion,
+  scheduleLlmWarm,
   waitForComfyQueueIdle,
   waitForOllamaUnload,
-  warmLlmInVram,
   withGenerationLock,
 } from "@/lib/vram-juggler";
 
@@ -44,6 +45,7 @@ async function runGeneration(input: {
   const comfyUrl = COMFYUI_URL.replace(/\/+$/, "");
 
   console.log("Evicting all Ollama models from VRAM...");
+  cancelPendingLlmWarm();
   await evictAllOllamaModels(ollamaUrl);
 
   const unloaded = await waitForOllamaUnload(ollamaUrl);
@@ -86,8 +88,9 @@ async function runGeneration(input: {
 
   const imageMeta = await pollComfyCompletion(comfyUrl, promptId);
 
-  console.log("Scheduling LLM reload after ComfyUI finishes...");
-  void warmLlmInVram(ollamaUrl, input.llmModel);
+  // Default: no Gemma preload — ComfyUI keeps diffusion weights resident.
+  // Set VRAM_JUGGLER_AUTO_WARM=true for a delayed, guarded preload (60s).
+  scheduleLlmWarm(ollamaUrl, input.llmModel, comfyUrl);
 
   return { url: proxyImageUrl(imageMeta) };
 }
@@ -123,9 +126,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error(error);
-
-    const ollamaUrl = SERVER_OLLAMA_HOST.replace(/\/+$/, "");
-    void warmLlmInVram(ollamaUrl, llmModel);
 
     return NextResponse.json(
       {

@@ -36,7 +36,6 @@ export function ImageLoader({
 
     let cancelled = false;
     let stageTimer: ReturnType<typeof setTimeout> | undefined;
-    let restoreTimer: ReturnType<typeof setTimeout> | undefined;
 
     async function generate() {
       setError(null);
@@ -74,13 +73,8 @@ export function ImageLoader({
 
         if (cancelled) return;
 
-        setStatus("Restoring AI engine...");
-        restoreTimer = setTimeout(() => {
-          if (!cancelled) {
-            setImageUrl(data.url!);
-            onBuiltRef.current?.(data.url!);
-          }
-        }, 1500);
+        setImageUrl(data.url!);
+        onBuiltRef.current?.(data.url!);
       } catch (err) {
         if (!cancelled) {
           const message =
@@ -100,7 +94,6 @@ export function ImageLoader({
     return () => {
       cancelled = true;
       if (stageTimer) clearTimeout(stageTimer);
-      if (restoreTimer) clearTimeout(restoreTimer);
     };
   }, [
     spec.url,
