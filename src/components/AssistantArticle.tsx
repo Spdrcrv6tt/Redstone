@@ -1,7 +1,7 @@
 "use client";
 
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { DiagramPending, DiagramRenderer } from "@/components/DiagramRenderer";
+import { DiagramPending, DiagramWidget } from "@/components/diagrams/DiagramWidget";
 import { SearchImageLayout } from "@/components/SearchImageLayout";
 import { parseDiagramSegments } from "@/lib/diagram";
 import {
@@ -127,9 +127,9 @@ export function AssistantArticle({
       {segments.map((segment, index) => {
         if (segment.type === "diagram") {
           return (
-            <DiagramRenderer
+            <DiagramWidget
               key={`diagram-${index}`}
-              htmlContent={segment.html}
+              payload={segment.payload}
             />
           );
         }

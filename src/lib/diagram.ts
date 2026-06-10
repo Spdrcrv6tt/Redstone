@@ -1,6 +1,6 @@
 export type DiagramSegment =
   | { type: "markdown"; text: string }
-  | { type: "diagram"; html: string }
+  | { type: "diagram"; payload: string }
   | { type: "diagram-pending" };
 
 const DIAGRAM_OPEN_RE = /<redstone-diagram\s*>/i;
@@ -36,10 +36,10 @@ export function protectDiagramBlocks(text: string): {
   };
 }
 
-/** Unwrap a markdown html fence when the model ignores the no-fence rule. */
+/** Unwrap a markdown fence when the model ignores the no-fence rule. */
 export function unwrapDiagramFences(content: string): string {
   const trimmed = content.trim();
-  const match = trimmed.match(/^```(?:html)?\s*\n([\s\S]*?)\n```\s*$/i);
+  const match = trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```\s*$/i);
   if (match && DIAGRAM_OPEN_RE.test(match[1])) {
     return match[1].trim();
   }
@@ -59,7 +59,7 @@ function extractClosedDiagrams(content: string): {
       const text = content.slice(lastIndex, index).trim();
       if (text) segments.push({ type: "markdown", text });
     }
-    segments.push({ type: "diagram", html: (match[1] ?? "").trim() });
+    segments.push({ type: "diagram", payload: (match[1] ?? "").trim() });
     lastIndex = index + match[0].length;
   }
 
@@ -86,8 +86,8 @@ function finalizeOpenDiagram(
 
   const closeMatch = afterOpen.match(DIAGRAM_CLOSE_RE);
   if (closeMatch && closeMatch.index !== undefined) {
-    const html = afterOpen.slice(0, closeMatch.index).trim();
-    if (html) segments.push({ type: "diagram", html });
+    const payload = afterOpen.slice(0, closeMatch.index).trim();
+    if (payload) segments.push({ type: "diagram", payload });
     const tail = afterOpen
       .slice(closeMatch.index + closeMatch[0].length)
       .trim();
@@ -95,8 +95,9 @@ function finalizeOpenDiagram(
     return segments;
   }
 
-  if (afterOpen.length > 0 && (streamComplete || afterOpen.length > 120)) {
-    segments.push({ type: "diagram", html: afterOpen });
+  const minPartial = afterOpen.trimStart().startsWith("{") ? 24 : 120;
+  if (afterOpen.length > 0 && (streamComplete || afterOpen.length > minPartial)) {
+    segments.push({ type: "diagram", payload: afterOpen });
     return segments;
   }
 

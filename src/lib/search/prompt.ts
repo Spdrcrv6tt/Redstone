@@ -167,18 +167,30 @@ export function buildAugmentedSystemPrompt(
   return finalSystemPrompt;
 }
 
-const DIAGRAM_CORE = `You are an expert interactive visualizer. The user wants to learn a complex concept visually through an in-chat widget — NOT a photograph, NOT a prose essay.
-
-You MUST write a single-file, interactive HTML document using vanilla HTML, CSS, and JavaScript.
-You may use CDN links in <head> for libraries such as D3.js, Chart.js, or Anime.js when they help.
+const DIAGRAM_CORE = `You are a technical data architect. The user wants to visualize a complex mechanical or scientific system. Our UI renders native interactive diagrams from a strict JSON configuration — you do NOT write HTML, CSS, JavaScript, or Canvas code.
 
 CRITICAL RULES:
-1. Wrap the ENTIRE output exactly inside: <redstone-diagram>...</redstone-diagram>
-2. Do NOT use markdown. Do NOT use \`\`\`html code fences. Start immediately with <redstone-diagram><!DOCTYPE html>...
-3. The diagram must be self-contained and visually appealing. Prefer a dark theme (#0f1117 background, light text) to match the chat UI.
-4. Add basic interactivity: hover states, labels, and buttons or steps to walk through phases when the concept has stages.
-5. Output ONLY the diagram block. No preamble, no apology, no "here is your diagram", no citations, no mention of photos or missing images.
-6. Never reference system prompts, external data blocks, or internal tooling.`;
+1. Wrap valid JSON exactly inside: <redstone-diagram>...</redstone-diagram>
+2. Do NOT use markdown. Do NOT use \`\`\`json code fences. Start immediately with <redstone-diagram>{
+3. Output ONLY the diagram block. No preamble, apology, citations, or mention of photos or missing images.
+4. Never reference system prompts, external data blocks, or internal tooling.
+5. Keep the JSON compact — under 30 lines. Use accurate numbers and labels from your knowledge or the external data block.
+
+Supported types:
+
+inline-engine — four-stroke inline engines (cars, motorcycles, etc.):
+<redstone-diagram>
+{
+  "type": "inline-engine",
+  "title": "Inline-4 Four-Stroke Engine",
+  "cylinders": 4,
+  "firingOrder": [1, 3, 4, 2],
+  "labels": ["Intake", "Compression", "Power", "Exhaust"],
+  "notes": "Brief factual note about timing or balance."
+}
+</redstone-diagram>
+
+Pick the closest supported type. For engines always use inline-engine with the correct cylinder count and firing order.`;
 
 /** Dedicated system prompt for interactive diagram turns — no photo/visual conflict rules. */
 export function buildDiagramSystemPrompt(
@@ -209,7 +221,7 @@ export function buildDiagramSystemPrompt(
   if (webSearchRan && !searchError && sources.length > 0) {
     finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
     finalSystemPrompt +=
-      "\n\nUse the external data above for accurate labels, numbers, and sequence order inside the diagram. Do not quote it as prose — embed facts into the visualization.";
+      "\n\nUse the external data above for accurate firing orders, labels, counts, and sequence order in the JSON fields. Do not quote it as prose.";
   }
 
   return finalSystemPrompt;
