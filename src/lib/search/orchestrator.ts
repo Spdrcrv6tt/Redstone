@@ -16,18 +16,18 @@ export type RouterUiHint =
 export interface OrchestratorPlan {
   intent: RouterIntent;
   webSearch: boolean;
-  webQuery: string;
+  optimizedSearchQuery: string;
   imageSearch: boolean;
   imageQuery: string;
   uiHint: RouterUiHint;
 }
 
-const ORCHESTRATOR_PROMPT = `You are a rigid routing engine. Analyze the incoming user query. Classify its core intent, determine if external live data is mandatory, and select the optimal UI layout hint to render the expected data structure. Do not output anything other than the requested JSON schema.
+const ORCHESTRATOR_PROMPT = `You are a rigid routing engine. Convert natural language user queries into raw, keyword-dense search strings optimized for search engines (e.g., convert 'What were the names of the senior officers of the USS Enterprise NCC-1701-D?' into 'USS Enterprise D senior staff main characters roster'). Determine the correct intent and layout hint. Output nothing but the requested JSON schema.
 
 Field rules:
 - intent: factual_query (facts/entities/history), procedural_task (how-to steps), creative (writing/brainstorm), code_generation (code/debug).
 - web_search and image_search are independent — both may be true.
-- web_query: concise Brave query when web_search is true.
+- optimized_search_query: keyword-dense Brave query with natural-language fluff stripped when web_search is true.
 - image_query: disambiguated photo subject when image_search is true (e.g. "USS Enterprise NCC-1701-D Star Trek starship").
 - ui_hint: standard (default prose), table (lists/rosters), step_by_step (procedures), comparison (A vs B).`;
 
@@ -53,7 +53,7 @@ function parseOrchestratorResponse(raw: string): OrchestratorPlan | null {
     const data = JSON.parse(jsonText) as {
       intent?: string;
       web_search?: boolean;
-      web_query?: string;
+      optimized_search_query?: string;
       image_search?: boolean;
       image_query?: string;
       ui_hint?: string;
@@ -66,7 +66,7 @@ function parseOrchestratorResponse(raw: string): OrchestratorPlan | null {
     return {
       intent,
       webSearch: !!data.web_search,
-      webQuery: (data.web_query ?? "").trim(),
+      optimizedSearchQuery: (data.optimized_search_query ?? "").trim(),
       imageSearch: !!data.image_search,
       imageQuery: (data.image_query ?? "").trim(),
       uiHint,
@@ -97,7 +97,7 @@ const toolRouterSchema = {
       ],
     },
     web_search: { type: "boolean" },
-    web_query: { type: "string" },
+    optimized_search_query: { type: "string" },
     image_search: { type: "boolean" },
     image_query: { type: "string" },
     ui_hint: {
@@ -108,7 +108,7 @@ const toolRouterSchema = {
   required: [
     "intent",
     "web_search",
-    "web_query",
+    "optimized_search_query",
     "image_search",
     "image_query",
     "ui_hint",

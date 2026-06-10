@@ -46,7 +46,7 @@ export interface OrchestratorDecisionMeta {
   intent: string;
   uiHint: string;
   webSearch: boolean;
-  webQuery: string;
+  optimizedSearchQuery: string;
   imageSearch: boolean;
   imageQuery: string;
   reason: string;

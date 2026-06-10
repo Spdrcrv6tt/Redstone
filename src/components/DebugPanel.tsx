@@ -89,8 +89,8 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
                       ? `Watchdog UI hint: ${decision.orchestrator.uiHint}`
                       : null,
                     `Watchdog web: ${decision.orchestrator.webSearch}`,
-                    decision.orchestrator.webQuery
-                      ? `Watchdog web query: ${decision.orchestrator.webQuery}`
+                    decision.orchestrator.optimizedSearchQuery
+                      ? `Watchdog search query: ${decision.orchestrator.optimizedSearchQuery}`
                       : null,
                     `Watchdog image: ${decision.orchestrator.imageSearch}`,
                     decision.orchestrator.imageQuery

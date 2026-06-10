@@ -14,6 +14,7 @@ import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
 import {
   imagePlanFromOrchestrator,
   runOrchestrator,
+  type RouterUiHint,
 } from "@/lib/search/orchestrator";
 import { buildAugmentedSystemPrompt } from "@/lib/search/prompt";
 import { routerWantsSearch } from "@/lib/search/router";
@@ -29,6 +30,7 @@ import type {
   AgentStreamMeta,
   OrchestratorDecisionMeta,
   SearchMode,
+  SearchSource,
 } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +58,38 @@ function parseSearchMode(value: unknown): SearchMode {
 }
 
 type StatusEmitter = (state: AgentPipelineStatus, message: string) => void;
+
+const BLACKLISTED_SOURCE_DOMAINS = [
+  "fed-space.com",
+  "memory-beta.wikia.com",
+  "memory-beta.fandom.com",
+];
+
+/** Append authoritative domain filters for niche queries before Brave execution. */
+function applyDomainFiltersToQuery(query: string): string {
+  let finalSearchQuery = query.trim();
+  const lower = finalSearchQuery.toLowerCase();
+
+  if (lower.includes("enterprise") || lower.includes("star trek")) {
+    finalSearchQuery +=
+      " site:en.wikipedia.org OR site:memory-alpha.fandom.com";
+  }
+
+  return finalSearchQuery;
+}
+
+function filterBlacklistedSources(sources: SearchSource[]): SearchSource[] {
+  return sources.filter((source) => {
+    try {
+      const host = new URL(source.url).hostname.toLowerCase();
+      return !BLACKLISTED_SOURCE_DOMAINS.some(
+        (domain) => host === domain || host.endsWith(`.${domain}`)
+      );
+    } catch {
+      return true;
+    }
+  });
+}
 
 interface PipelineInput {
   host: string;
@@ -110,6 +144,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   let orchestratorMeta: OrchestratorDecisionMeta | undefined;
   let overrideWebQuery = "";
   let overrideImagePlan: ImageSearchPlan | null = null;
+  let watchdogUiHint: RouterUiHint | undefined;
   // When watchdog explicitly decides no image, suppress the heuristic plan.
   let watchdogSuppressImage = false;
 
@@ -134,14 +169,16 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
       const orch = orchResult.plan;
       if (orch) {
         runWebSearch = orch.webSearch;
-        overrideWebQuery = orch.webQuery || draftPlan.webSearchQuery;
+        overrideWebQuery =
+          orch.optimizedSearchQuery || draftPlan.webSearchQuery;
+        watchdogUiHint = orch.uiHint;
         searchReason = `watchdog: ${orch.intent} (${orch.uiHint})`;
         searchConfidence = "high";
         orchestratorMeta = {
           intent: orch.intent,
           uiHint: orch.uiHint,
           webSearch: orch.webSearch,
-          webQuery: orch.webQuery,
+          optimizedSearchQuery: orch.optimizedSearchQuery,
           imageSearch: orch.imageSearch,
           imageQuery: orch.imageQuery,
           reason: searchReason,
@@ -199,23 +236,25 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 
   const webQuery =
     overrideWebQuery || draftPlan.webSearchQuery;
+  const finalSearchQuery = applyDomainFiltersToQuery(webQuery);
 
-  if (runWebSearch && webQuery && braveKey) {
+  if (runWebSearch && finalSearchQuery && braveKey) {
     emitStatus("searching", "Querying live web endpoints...");
     const t0 = Date.now();
     try {
       if (draftPlan.exhaustiveList && !overrideWebQuery) {
         const queries = [
-          draftPlan.webSearchQuery,
-          ...draftPlan.supplementalWebQueries,
+          applyDomainFiltersToQuery(draftPlan.webSearchQuery),
+          ...draftPlan.supplementalWebQueries.map(applyDomainFiltersToQuery),
         ];
         sources = await executeWebSearches(queries, braveKey, 10);
         sources = await enrichSourcesForList(sources);
       } else {
-        const webOnly = await executeSearch(webQuery, null, braveKey);
+        const webOnly = await executeSearch(finalSearchQuery, null, braveKey);
         sources = webOnly.sources;
         searchError = webOnly.searchError;
       }
+      sources = filterBlacklistedSources(sources);
     } catch (err) {
       searchError =
         err instanceof Error ? err.message : "Web search failed";
@@ -261,7 +300,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     sources,
     visualMode,
     searchError,
-    runWebSearch
+    runWebSearch,
+    watchdogUiHint
   );
 
   const upstreamMessages: OllamaChatMessage[] = [
@@ -272,7 +312,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   const meta: AgentStreamMeta = {
     sources,
     images,
-    query: runWebSearch ? webQuery : "",
+    query: runWebSearch ? finalSearchQuery : "",
     searchDecision: {
       ran: runWebSearch,
       reason: searchReason,
