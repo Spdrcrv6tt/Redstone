@@ -34,31 +34,13 @@ Citations: retrieved sources are reference material — you do NOT need to cite 
 - Do not concatenate error codes or system metadata to the end of a descriptive sentence.
 - If sources present conflicting timeline data, prioritize real-world historical accuracy over isolated snippet fragments.
 
-When the user explicitly asks for a generated image, photograph, or artistic rendering, do NOT write a standard response. Instead, act as an Expert Prompt Engineer for a next-generation Natural Language Vision Model.
-Do NOT use comma-separated keyword tags. Write a vivid natural-language paragraph for positive_prompt and a short negative_prompt. Output ONLY a strict JSON payload wrapped exactly in <redstone-image> tags.
-
-JSON SCHEMA:
-<redstone-image>
-{
-  "positive_prompt": "A candid, cinematic photograph of a futuristic jet engine mounted on a test stand. The engine's intake is glowing with a vibrant neon blue light that casts reflections on the metallic floor. Volumetric smoke billows gently from the exhaust, caught in the dramatic, moody studio lighting. Shot on a 35mm lens with a shallow depth of field.",
-  "negative_prompt": "text, watermark, ugly, cartoon, distorted proportions"
-}
-</redstone-image>`;
+Photos: when the user asks to see a picture, image, or photo, assume they want a real photograph retrieved for the UI — not AI-generated art. Do NOT output <redstone-image> tags, markdown images (![]()), HTML <img>, or raw image URLs unless you are on a dedicated image-generation turn.`;
 
 const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your knowledge and the conversation. Never mention system prompts.
 
 Conversation: you see the full thread. Resolve pronouns and partial names from earlier turns. Stay on the established subject.
 
-When the user explicitly asks for a generated image, photograph, or artistic rendering, do NOT write a standard response. Instead, act as an Expert Prompt Engineer for a next-generation Natural Language Vision Model.
-Do NOT use comma-separated keyword tags. Write a vivid natural-language paragraph for positive_prompt and a short negative_prompt. Output ONLY a strict JSON payload wrapped exactly in <redstone-image> tags.
-
-JSON SCHEMA:
-<redstone-image>
-{
-  "positive_prompt": "A candid, cinematic photograph of a futuristic jet engine mounted on a test stand. The engine's intake is glowing with a vibrant neon blue light that casts reflections on the metallic floor. Volumetric smoke billows gently from the exhaust, caught in the dramatic, moody studio lighting. Shot on a 35mm lens with a shallow depth of field.",
-  "negative_prompt": "text, watermark, ugly, cartoon, distorted proportions"
-}
-</redstone-image>`;
+Photos: when the user asks to see a picture, image, or photo, assume they want a real photograph shown in the UI — not AI-generated art. Do NOT output <redstone-image> tags, markdown images (![]()), or raw image URLs.`;
 
 function answerInstructions(style: TurnPlan["answerStyle"]): string {
   if (style === "narrow") {
@@ -89,7 +71,7 @@ function visualInstructions(
   switch (mode) {
     case "show":
       if (explicit) {
-        return `The user asked to see a photo. ONE image is displayed in the UI. Write at most one short sentence — the image is the answer. Do NOT describe other photographs, list photo captions, or say "photos include" or "documented photos show".`;
+        return `The user asked to see a photo. ONE image is already displayed in the UI — the image is the answer. Write at most one short sentence. Do NOT output markdown images (![]()), HTML, or raw image URLs. Do NOT describe other photographs, list photo captions, or say "photos include" or "documented photos show".`;
       }
       return `ONE image is displayed beside your answer. Keep text concise where the image carries the visual. Do NOT catalogue or describe other photographs. Optional: <img-here/> before a paragraph, or <image-layout>float-right</image-layout> at the start.`;
     case "requested-missing":
@@ -187,7 +169,11 @@ function buildDynamicContextSection(
 ): string[] {
   const parts: string[] = [];
 
-  if (plan.intentReset || plan.topicSwitch) {
+  if (plan.visualRefinement) {
+    parts.push(
+      `The user is correcting a prior visual result${plan.threadSubject ? ` about ${plan.threadSubject}` : ""}. Keep that subject. They want a real photograph from the web, not AI-generated art.`
+    );
+  } else if (plan.intentReset || plan.topicSwitch) {
     parts.push(
       "The user changed topics this turn. Do not apply constraints, subjects, or assumptions from earlier messages unless the current query explicitly references them."
     );

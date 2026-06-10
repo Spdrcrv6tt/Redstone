@@ -28,6 +28,17 @@ export function stripCiteTags(text: string): string {
   return text.replace(/<cite>[^<]*<\/cite>/gi, "");
 }
 
+/** Remove markdown images and bare image URLs the model should not emit. */
+export function stripLeakedImageMarkup(text: string): string {
+  let result = text.replace(/!\[[^\]]*\]\([^)]+\)/g, "");
+  result = result.replace(
+    /https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?\S*)?/gi,
+    ""
+  );
+  result = result.replace(/httpshttps:\/\//gi, "https://");
+  return result.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 /** Strip photo catalogue prose when no image was shown. */
 export function stripPhotoCatalogue(text: string): string {
   const patterns = [
@@ -93,9 +104,13 @@ export function thinCitations(text: string, maxTotal = 2): string {
     .join("");
 }
 
-export function cleanSearchResponse(text: string): string {
+export function cleanSearchResponse(
+  text: string,
+  options?: { imagesAttached?: boolean }
+): string {
+  const source = options?.imagesAttached ? stripImageBlocks(text) : text;
   const { text: widgetShielded, restore: restoreWidgets } =
-    protectWidgetBlocks(text);
+    protectWidgetBlocks(source);
   const { text: imageShielded, restore: restoreImages } =
     protectImageBlocks(widgetShielded);
   const { text: shielded, restore: restoreStudy } =
@@ -110,6 +125,10 @@ export function cleanSearchResponse(text: string): string {
   result = stripImageAcknowledgments(result);
   result = stripNamesakeDisambiguation(result);
   result = stripPhotoCatalogue(result);
+
+  if (options?.imagesAttached) {
+    result = stripLeakedImageMarkup(result);
+  }
 
   return restore(result);
 }

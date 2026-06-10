@@ -42,7 +42,11 @@ export function MessageBubble({
   const searchLinks = message.search?.links ?? [];
   const hasSearchImages = searchImages.length > 0;
   const assistantContent =
-    !isUser && message.content ? cleanSearchResponse(message.content) : "";
+    !isUser && message.content
+      ? cleanSearchResponse(message.content, {
+          imagesAttached: hasSearchImages,
+        })
+      : "";
 
   const [imageReady, setImageReady] = useState(!hasSearchImages);
 

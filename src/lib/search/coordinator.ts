@@ -63,6 +63,8 @@ export interface TurnPlan {
   intentReset: boolean;
   /** New query is semantically unrelated to the prior thread subject. */
   topicSwitch: boolean;
+  /** User corrected a prior visual (e.g. "no, from the internet"). */
+  visualRefinement: boolean;
   searchDecision: SearchDecision;
 }
 
@@ -298,6 +300,16 @@ const DEMANDS_INTERACTIVE_DIAGRAM =
 const DEMANDS_GENERATED_IMAGE =
   /\b(?:generate|create|draw|paint|render|make|design)\b[\s\S]{0,48}\b(?:image|picture|photo|photograph|artwork|artistic\s+rendering|illustration)\b/i;
 
+/** User wants a real web photo — never route to local image generation. */
+export const PREFERS_WEB_IMAGE =
+  /\b(?:from (?:the )?internet|on the web|online|google image|image search|wikimedia|find (?:a |an )?(?:photo|picture|image) (?:online|on the web)|real (?:photo|picture|image)|actual (?:photo|picture|image))\b/i;
+
+const VISUAL_REFINEMENT_PREFIX =
+  /^(?:no[,.\s!]+|nope[,.\s!]+|not that[,.\s!]+|wrong[,.\s!]+|instead[,.\s!]+|i meant[,.\s!]+)/i;
+
+const REJECTS_GENERATION =
+  /\b(?:not generated|no t?ai|don't generate|do not generate|don't draw|do not draw)\b/i;
+
 export function demandsFlashcards(query: string): boolean {
   return /\b(?:flash\s*cards?|flashcard deck|make (?:me )?(?:a )?deck(?: of)?|study cards?)\b/i.test(
     query.trim()
@@ -328,9 +340,36 @@ export function demandsLinkEmbed(query: string): boolean {
   );
 }
 
+export function prefersWebImage(query: string): boolean {
+  return PREFERS_WEB_IMAGE.test(query.trim());
+}
+
+export function hasContextualPronoun(query: string): boolean {
+  return /\b(?:it|that|this|them|one)\b/i.test(query);
+}
+
+export function isVisualRefinement(query: string): boolean {
+  const q = query.trim();
+  if (!q) return false;
+  if (VISUAL_REFINEMENT_PREFIX.test(q)) return true;
+  if (prefersWebImage(q)) return true;
+  if (REJECTS_GENERATION.test(q)) return true;
+  return false;
+}
+
+export function stripCorrectionPrefix(query: string): string {
+  return query
+    .replace(
+      /^(?:no[,.\s!]+|nope[,.\s!]+|not that[,.\s!]+|wrong[,.\s!]+|instead[,.\s!]+|i meant[,.\s!]+)/i,
+      ""
+    )
+    .trim();
+}
+
 export function demandsGeneratedImage(query: string): boolean {
   const q = query.trim();
   if (!q || demandsInteractiveDiagram(q)) return false;
+  if (prefersWebImage(q) || isVisualRefinement(q)) return false;
   if (DEMANDS_GENERATED_IMAGE.test(q)) return true;
   if (/\b(?:ai[- ]?generated|generated)\s+(?:image|picture|photo)\b/i.test(q)) {
     return true;
@@ -517,6 +556,14 @@ export function decideWebSearch(
     };
   }
 
+  if (isVisualRefinement(q) && EXPLICIT_VISUAL.test(q)) {
+    return {
+      search: false,
+      reason: "web photo refinement (image search only)",
+      confidence: "high",
+    };
+  }
+
   if (demandsInteractiveDiagram(q)) {
     return {
       search: true,
@@ -697,6 +744,10 @@ export function checkTopicSwitch(
   lastTopic: string | null
 ): boolean {
   if (!lastTopic?.trim()) return false;
+  if (EXPLICIT_VISUAL.test(newInput) && hasContextualPronoun(newInput)) {
+    return false;
+  }
+  if (isVisualRefinement(newInput)) return false;
   if (detectIntentReset(newInput)) return true;
 
   const score = topicSimilarityScore(newInput, lastTopic);
@@ -735,6 +786,7 @@ export interface QueryDetermination {
   query: string;
   intentReset: boolean;
   topicSwitch: boolean;
+  visualRefinement: boolean;
 }
 
 /**
@@ -748,7 +800,32 @@ export function determineWebSearchQuery(
 ): QueryDetermination {
   const latest = newInput.trim();
   if (!latest) {
-    return { query: "", intentReset: false, topicSwitch: false };
+    return {
+      query: "",
+      intentReset: false,
+      topicSwitch: false,
+      visualRefinement: false,
+    };
+  }
+
+  const subject = getTopicFromHistory(memory);
+  const visualFollowUp =
+    EXPLICIT_VISUAL.test(latest) &&
+    (hasContextualPronoun(latest) || isVisualRefinement(latest));
+
+  if (visualFollowUp) {
+    const stripped = stripCorrectionPrefix(latest);
+    const visualNoise =
+      /(?:show|see|display)\s+(?:me\s+)?(?:an?\s+)?(?:images?|pictures?|photos?)\s*(?:from\s+(?:the\s+)?internet\s*)?(?:of\s+)?|(?:from\s+(?:the\s+)?internet|online|on\s+the\s+web)|(?:of\s+)?(?:it|that|this)\b/gi;
+    const query = subject
+      ? `${subject} photograph`.trim()
+      : stripped.replace(visualNoise, "").trim() || stripped;
+    return {
+      query: query.slice(0, 400),
+      intentReset: false,
+      topicSwitch: false,
+      visualRefinement: true,
+    };
   }
 
   if (detectIntentReset(latest)) {
@@ -757,10 +834,11 @@ export function determineWebSearchQuery(
       query: clean.slice(0, 400),
       intentReset: true,
       topicSwitch: true,
+      visualRefinement: false,
     };
   }
 
-  const lastTopic = getTopicFromHistory(memory);
+  const lastTopic = subject;
   const topicSwitch = checkTopicSwitch(latest, lastTopic);
 
   if (topicSwitch) {
@@ -768,6 +846,7 @@ export function determineWebSearchQuery(
       query: latest.slice(0, 400),
       intentReset: false,
       topicSwitch: true,
+      visualRefinement: false,
     };
   }
 
@@ -775,6 +854,7 @@ export function determineWebSearchQuery(
     query: buildWebSearchQuery(latest, memory),
     intentReset: false,
     topicSwitch: false,
+    visualRefinement: false,
   };
 }
 
@@ -949,6 +1029,17 @@ function imagePlanForTopic(
     .filter((t) => t.length > 2);
   const queries = [`"${label}" photograph`, `${label} historical photo`];
 
+  if (
+    /\b(?:bomber|fighter|aircraft|airplane|jet|helicopter|stratofortress|tank|warship|submarine)\b/i.test(
+      label
+    )
+  ) {
+    queries.unshift(
+      `${label} in flight photograph`,
+      `${label} official military photo`
+    );
+  }
+
   if (/\bSL-1\b/i.test(label)) {
     queries.unshift(
       "SL-1 nuclear reactor Idaho Falls photograph",
@@ -1109,8 +1200,8 @@ export function planTurn(
   const queryPlan = determineWebSearchQuery(raw, messages, memory);
   let webSearchQuery = queryPlan.query;
   let supplementalWebQueries: string[] = [];
-  const { intentReset, topicSwitch } = queryPlan;
-  const contextLocked = intentReset || topicSwitch;
+  const { intentReset, topicSwitch, visualRefinement } = queryPlan;
+  const contextLocked = (intentReset || topicSwitch) && !visualRefinement;
 
   if (exhaustiveList && !contextLocked) {
     const listQueries = buildListSearchQueries(memory, messages, raw);
@@ -1120,7 +1211,8 @@ export function planTurn(
 
   const studyMode = detectStudyMode(raw);
   const needsDiagram = !studyMode && demandsInteractiveDiagram(raw);
-  const needsImageGeneration = !studyMode && demandsGeneratedImage(raw);
+  const needsImageGeneration =
+    !studyMode && demandsGeneratedImage(raw) && !visualRefinement;
   const embedVideo = studyMode !== null || demandsVideoEmbed(raw);
   const embedLinks = studyMode !== null || demandsLinkEmbed(raw);
   const explicitVisualRequest =
@@ -1211,6 +1303,7 @@ export function planTurn(
     embedLinks,
     intentReset,
     topicSwitch,
+    visualRefinement,
     searchDecision,
   };
 }
