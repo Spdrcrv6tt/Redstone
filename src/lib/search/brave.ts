@@ -92,18 +92,34 @@ async function fetchWikipediaExtract(url: string): Promise<string | null> {
   );
   if (!title) return null;
 
+  const fetchOpts = {
+    signal: AbortSignal.timeout(12_000),
+    cache: "no-store" as const,
+  };
+
+  // REST plain endpoint returns the full article body, not intro-only extracts.
+  try {
+    const restUrl = `https://en.wikipedia.org/api/rest_v1/page/plain/${encodeURIComponent(title)}`;
+    const restRes = await fetch(restUrl, fetchOpts);
+    if (restRes.ok) {
+      const plain = (await restRes.text()).trim();
+      if (plain.length >= 200) return plain;
+    }
+  } catch {
+    /* fall through to action API */
+  }
+
   try {
     const api = new URL("https://en.wikipedia.org/w/api.php");
     api.searchParams.set("action", "query");
     api.searchParams.set("prop", "extracts");
     api.searchParams.set("explaintext", "1");
+    api.searchParams.set("exsectionformat", "plain");
+    // Do NOT set exintro — that limits to the lead summary only.
     api.searchParams.set("titles", title);
     api.searchParams.set("format", "json");
 
-    const res = await fetch(api.toString(), {
-      signal: AbortSignal.timeout(8000),
-      cache: "no-store",
-    });
+    const res = await fetch(api.toString(), fetchOpts);
     if (!res.ok) return null;
 
     const data = (await res.json()) as {

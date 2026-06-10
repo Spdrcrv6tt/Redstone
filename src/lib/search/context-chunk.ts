@@ -1,3 +1,4 @@
+import { needsUnconditionalDeepEnrich } from "@/lib/search/query-enhance";
 import type { SearchSource } from "@/types";
 
 /** Rough token estimate (~4 chars/token for English prose). */
@@ -103,7 +104,8 @@ export function extractRelevantParagraphs(
   return chosen.join("\n\n");
 }
 
-const DEFAULT_MAX_CONTEXT_TOKENS = 2000;
+/** ~15,000 characters aggregate context budget. */
+const DEFAULT_MAX_CONTEXT_TOKENS = 4000;
 
 /**
  * Trim each source to keyword-relevant paragraphs and cap aggregate
@@ -114,13 +116,16 @@ export function chunkSourcesForContext(
   query: string,
   maxTokens = DEFAULT_MAX_CONTEXT_TOKENS
 ): SearchSource[] {
+  const timelineQuery = needsUnconditionalDeepEnrich(query);
   let budget = maxTokens;
   const chunked: SearchSource[] = [];
 
   for (const source of sources.slice(0, 4)) {
     if (budget <= 0) break;
 
-    const extracted = extractRelevantParagraphs(source.snippet, query);
+    const extracted = timelineQuery
+      ? source.snippet
+      : extractRelevantParagraphs(source.snippet, query, 12);
     const snippet =
       extracted ||
       source.snippet.slice(0, Math.min(source.snippet.length, budget * 4));
