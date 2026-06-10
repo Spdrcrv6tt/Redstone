@@ -3,6 +3,7 @@ import type {
   TurnPlan,
   VisualMode,
 } from "@/lib/search/coordinator";
+import { chunkSourcesForContext } from "@/lib/search/context-chunk";
 import type { RouterUiHint } from "@/lib/search/orchestrator";
 import type { SearchSource } from "@/types";
 
@@ -80,10 +81,15 @@ function layoutConstraints(uiHint?: RouterUiHint): string {
   return "";
 }
 
-export function purifyAndInjectContext(sources: SearchSource[]): string {
+export function purifyAndInjectContext(
+  sources: SearchSource[],
+  userQuery = ""
+): string {
   if (!sources || sources.length === 0) return "";
 
-  const cleanSources = sources
+  const chunked = chunkSourcesForContext(sources, userQuery, 2000);
+
+  const cleanSources = chunked
     .map((src, index) => {
       let snippet = src.snippet
         .replace(/&quot;/g, '"')
@@ -104,7 +110,6 @@ export function purifyAndInjectContext(sources: SearchSource[]): string {
 
       return `[Source ${index + 1}]\nTitle: ${src.title}\nURL: ${src.url}\nContent: ${snippet}`;
     })
-    .slice(0, 4)
     .join("\n\n");
 
   return `\n<EXTERNAL_DATA_CONTEXT>\n${cleanSources}\n</EXTERNAL_DATA_CONTEXT>\n`;
@@ -154,7 +159,7 @@ export function buildAugmentedSystemPrompt(
   finalSystemPrompt += layoutConstraints(uiHint);
 
   if (webSearchRan && !searchError) {
-    finalSystemPrompt += purifyAndInjectContext(sources);
+    finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
   }
 
   return finalSystemPrompt;

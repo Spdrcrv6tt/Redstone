@@ -22,7 +22,10 @@ export interface OrchestratorPlan {
   uiHint: RouterUiHint;
 }
 
-const ORCHESTRATOR_PROMPT = `You are a rigid routing engine. Convert natural language user queries into raw, keyword-dense search strings optimized for search engines (e.g., convert 'What were the names of the senior officers of the USS Enterprise NCC-1701-D?' into 'USS Enterprise D senior staff main characters roster'). Determine the correct intent and layout hint. Output nothing but the requested JSON schema.
+const ORCHESTRATOR_PROMPT = `You are a rigid routing engine. Convert natural language user queries into raw, keyword-dense search strings optimized for search engines (e.g., convert 'What were the names of the senior officers of the USS Enterprise NCC-1701-D?' into 'USS Enterprise D senior staff main characters roster'). Determine the correct intent and layout hint.
+
+First reason step-by-step in a thinking block (use model thinking tags). After your reasoning, output ONLY a single JSON object (no markdown fences) matching this shape:
+{"intent":"...","web_search":true,"optimized_search_query":"...","image_search":false,"image_query":"...","ui_hint":"..."}
 
 Field rules:
 - intent: factual_query (facts/entities/history), procedural_task (how-to steps), creative (writing/brainstorm), code_generation (code/debug).
@@ -31,9 +34,20 @@ Field rules:
 - image_query: disambiguated photo subject when image_search is true (e.g. "USS Enterprise NCC-1701-D Star Trek starship").
 - ui_hint: standard (default prose), table (lists/rosters), step_by_step (procedures), comparison (A vs B).`;
 
-/** Strip <think>…</think> blocks that Qwen3 and similar models prepend. */
+/** Strip thinking blocks (Qwen3/Gemma) before JSON extraction. */
 function stripThinking(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const thinkEnd = new RegExp("</" + "think>", "i");
+  const thinkMatch = text.match(thinkEnd);
+  let after = text;
+  if (thinkMatch?.index !== undefined) {
+    after = text.slice(thinkMatch.index + thinkMatch[0].length);
+  }
+  return after
+    .replace(
+      /<think>[\s\S]*?<\/redacted_thinking>/gi,
+      ""
+    )
+    .trim();
 }
 
 function extractJsonObject(text: string): string | null {
@@ -84,37 +98,6 @@ export interface OrchestratorResult {
   raw?: string;
 }
 
-const toolRouterSchema = {
-  type: "object",
-  properties: {
-    intent: {
-      type: "string",
-      enum: [
-        "factual_query",
-        "procedural_task",
-        "creative",
-        "code_generation",
-      ],
-    },
-    web_search: { type: "boolean" },
-    optimized_search_query: { type: "string" },
-    image_search: { type: "boolean" },
-    image_query: { type: "string" },
-    ui_hint: {
-      type: "string",
-      enum: ["standard", "table", "step_by_step", "comparison"],
-    },
-  },
-  required: [
-    "intent",
-    "web_search",
-    "optimized_search_query",
-    "image_search",
-    "image_query",
-    "ui_hint",
-  ],
-} as const;
-
 /** Full watchdog call for aggressive mode. */
 export async function runOrchestrator(
   host: string,
@@ -140,8 +123,6 @@ export async function runOrchestrator(
       body: JSON.stringify({
         model,
         stream: false,
-        think: false,
-        format: toolRouterSchema,
         messages: [
           {
             role: "user",
@@ -150,7 +131,7 @@ export async function runOrchestrator(
         ],
         options: {
           temperature: 0,
-          num_predict: 150,
+          num_predict: 512,
           num_ctx: 4096,
         },
       }),

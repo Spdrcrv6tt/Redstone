@@ -131,7 +131,7 @@ export async function enrichSourcesWithDeepContent(
       return {
         ...source,
         title: `${source.title} (Wikipedia extract)`,
-        snippet: extract.slice(0, 8000),
+        snippet: extract,
       };
     })
   );
@@ -159,7 +159,7 @@ export async function enrichSourcesForList(
       ? {
           ...s,
           title: `${s.title} (Wikipedia extract)`,
-          snippet: extract.slice(0, 18000),
+          snippet: extract,
         }
       : s
   );

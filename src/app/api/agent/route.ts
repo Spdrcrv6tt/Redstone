@@ -229,31 +229,98 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     overrideWebQuery || draftPlan.webSearchQuery;
   const finalSearchQuery = enhanceSearchQuery(webQuery);
 
-  if (runWebSearch && finalSearchQuery && braveKey) {
+  const imagePlanEarly = watchdogSuppressImage
+    ? null
+    : overrideImagePlan ?? draftPlan.imageSearch;
+
+  const needsWeb = runWebSearch && !!finalSearchQuery && !!braveKey;
+  const needsImage = !!imagePlanEarly && !!braveKey;
+
+  if (runWebSearch && !braveKey) {
+    searchError = "Brave Search API key is not configured";
+  } else if (needsWeb || needsImage) {
     emitStatus("searching", "Querying live web endpoints...");
     const t0 = Date.now();
-    try {
-      if (draftPlan.exhaustiveList && !overrideWebQuery) {
-        const queries = [
-          enhanceSearchQuery(draftPlan.webSearchQuery),
-          ...draftPlan.supplementalWebQueries.map(enhanceSearchQuery),
-        ];
-        sources = await executeWebSearches(queries, braveKey, 10);
-        sources = await enrichSourcesForList(sources);
-      } else {
+
+    const webTask = async (): Promise<{
+      sources: SearchSource[];
+      searchError?: string;
+    }> => {
+      if (!needsWeb) return { sources: [] };
+      try {
+        if (draftPlan.exhaustiveList && !overrideWebQuery) {
+          const queries = [
+            enhanceSearchQuery(draftPlan.webSearchQuery),
+            ...draftPlan.supplementalWebQueries.map(enhanceSearchQuery),
+          ];
+          let batch = await executeWebSearches(queries, braveKey, 10);
+          batch = await enrichSourcesForList(batch);
+          batch = filterBlacklistedSources(batch);
+          batch = await enrichSourcesWithDeepContent(batch);
+          return { sources: batch };
+        }
         const webOnly = await executeSearch(finalSearchQuery, null, braveKey);
-        sources = webOnly.sources;
-        searchError = webOnly.searchError;
+        let batch = webOnly.sources;
+        if (webOnly.searchError) {
+          return { sources: batch, searchError: webOnly.searchError };
+        }
+        batch = filterBlacklistedSources(batch);
+        batch = await enrichSourcesWithDeepContent(batch);
+        return { sources: batch };
+      } catch (err) {
+        return {
+          sources: [],
+          searchError:
+            err instanceof Error ? err.message : "Web search failed",
+        };
       }
-      sources = filterBlacklistedSources(sources);
-      sources = await enrichSourcesWithDeepContent(sources);
-    } catch (err) {
-      searchError =
-        err instanceof Error ? err.message : "Web search failed";
+    };
+
+    const imageTask = async (): Promise<{
+      images: AgentStreamMeta["images"];
+      imageError?: string;
+      fallbackSources: SearchSource[];
+    }> => {
+      if (!needsImage || !imagePlanEarly) {
+        return { images: [], fallbackSources: [] };
+      }
+      try {
+        const withImages = await executeSearch(
+          "",
+          imagePlanEarly,
+          braveKey,
+          { skipWeb: true }
+        );
+        return {
+          images: withImages.images,
+          imageError: withImages.imageError,
+          fallbackSources: withImages.sources,
+        };
+      } catch (err) {
+        return {
+          images: [],
+          imageError:
+            err instanceof Error ? err.message : "Image search failed",
+          fallbackSources: [],
+        };
+      }
+    };
+
+    const [webResult, imageResult] = await Promise.all([
+      webTask(),
+      imageTask(),
+    ]);
+
+    sources = webResult.sources;
+    searchError = webResult.searchError;
+    images = imageResult.images;
+    imageError = imageResult.imageError;
+    if (!sources.length && runWebSearch && imageResult.fallbackSources.length) {
+      sources = imageResult.fallbackSources;
     }
+
     searchMs = Date.now() - t0;
-  } else if (runWebSearch && !braveKey) {
-    searchError = "Brave Search API key is not configured";
+    imageMs = Date.now() - t0;
   }
 
   const turnPlan = planTurn(
@@ -262,25 +329,6 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     sources,
     priorImageUrls
   );
-
-  const imagePlan = watchdogSuppressImage
-    ? null
-    : overrideImagePlan ?? turnPlan.imageSearch;
-
-  if (imagePlan && braveKey) {
-    emitStatus("searching", "Querying live web endpoints...");
-    const t0 = Date.now();
-    const withImages = await executeSearch(
-      webQuery || turnPlan.webSearchQuery,
-      imagePlan,
-      braveKey,
-      { skipWeb: sources.length > 0 || !runWebSearch }
-    );
-    images = withImages.images;
-    imageError = withImages.imageError;
-    if (!sources.length && runWebSearch) sources = withImages.sources;
-    imageMs = Date.now() - t0;
-  }
 
   const visualMode = finalizeVisualMode(turnPlan, images.length);
 
