@@ -8,23 +8,36 @@ interface DynamicWidgetLoaderProps {
   spec: string;
   height?: string;
   model?: string;
+  cachedHtml?: string;
+  onBuilt?: (html: string) => void;
 }
 
 export function DynamicWidgetLoader({
   spec,
   height = "65vh",
   model: modelProp,
+  cachedHtml,
+  onBuilt,
 }: DynamicWidgetLoaderProps) {
   const settings = useAppStore((s) => s.settings);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [html, setHtml] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const onBuiltRef = useRef(onBuilt);
+  onBuiltRef.current = onBuilt;
+  const [html, setHtml] = useState<string | null>(cachedHtml ?? null);
+  const [loading, setLoading] = useState(!cachedHtml);
   const [error, setError] = useState<string | null>(null);
   const [iframeHeight, setIframeHeight] = useState(height);
 
   const model = modelProp ?? settings.defaultModel;
 
   useEffect(() => {
+    if (cachedHtml) {
+      setHtml(cachedHtml);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
 
     async function buildWidget() {
@@ -51,7 +64,10 @@ export function DynamicWidgetLoader({
         if (!data.html?.trim()) {
           throw new Error("Builder returned empty HTML");
         }
-        if (!cancelled) setHtml(data.html);
+        if (!cancelled) {
+          setHtml(data.html);
+          onBuiltRef.current?.(data.html);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Widget build failed");
@@ -65,7 +81,7 @@ export function DynamicWidgetLoader({
     return () => {
       cancelled = true;
     };
-  }, [spec, model, settings.ollamaHost, settings.apiKey]);
+  }, [cachedHtml, spec, model, settings.ollamaHost, settings.apiKey]);
 
   const srcDoc = useMemo(
     () => (html ? normalizeDiagramHtml(html, { widgetViewport: true }) : ""),

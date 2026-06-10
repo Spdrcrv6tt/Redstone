@@ -99,10 +99,40 @@ export function parseWidgetArchitectSpec(raw: string): WidgetArchitectSpec | nul
   const height =
     typeof propsRecord.height === "string" ? propsRecord.height : "65vh";
 
+  const html =
+    typeof propsRecord.html === "string" && propsRecord.html.trim()
+      ? propsRecord.html
+      : undefined;
+
   return {
     component: "DynamicWidget",
-    props: { spec, height },
+    props: { spec, height, ...(html ? { html } : {}) },
   };
+}
+
+/** Persist builder HTML into the nth <redstone-widget> block in message content. */
+export function embedWidgetHtml(
+  content: string,
+  widgetIndex: number,
+  html: string
+): string {
+  let index = 0;
+  return content.replace(WIDGET_BLOCK_RE, (match, payload: string) => {
+    if (index !== widgetIndex) {
+      index++;
+      return match;
+    }
+    index++;
+
+    const spec = parseWidgetArchitectSpec(payload);
+    if (!spec || spec.props.html) return match;
+
+    const enriched = {
+      component: "DynamicWidget",
+      props: { ...spec.props, html },
+    };
+    return `<redstone-widget>${JSON.stringify(enriched)}</redstone-widget>`;
+  });
 }
 
 function extractClosedWidgets(content: string): {

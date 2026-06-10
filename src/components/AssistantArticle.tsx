@@ -24,6 +24,7 @@ interface AssistantArticleProps {
   previewTargetId?: string;
   streamComplete?: boolean;
   model?: string;
+  onWidgetBuilt?: (widgetIndex: number, html: string) => void;
 }
 
 interface MarkdownArticleBodyProps {
@@ -103,6 +104,7 @@ export function AssistantArticle({
   previewTargetId,
   streamComplete = true,
   model,
+  onWidgetBuilt,
 }: AssistantArticleProps) {
   const { layout: chosenLayout, content: rawBody } = parseImageLayout(content);
   const segments = parseContentSegments(rawBody, { streamComplete });
@@ -125,17 +127,21 @@ export function AssistantArticle({
   }
 
   let firstMarkdown = true;
+  let widgetOrdinal = 0;
 
   return (
     <div className="journal-article">
       {segments.map((segment, index) => {
         if (segment.type === "widget") {
+          const widgetIndex = widgetOrdinal++;
           return (
             <DynamicWidgetLoader
-              key={`widget-${index}`}
+              key={`widget-${widgetIndex}`}
               spec={segment.spec.props.spec}
               height={segment.spec.props.height}
+              cachedHtml={segment.spec.props.html}
               model={model}
+              onBuilt={(html) => onWidgetBuilt?.(widgetIndex, html)}
             />
           );
         }

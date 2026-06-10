@@ -134,6 +134,7 @@ export default function Home() {
                         <MessageBubble
                           key={msg.id}
                           message={msg}
+                          conversationId={activeConversationId ?? undefined}
                           onRegenerate={regenerate}
                           showRegenerate={
                             msg.id === lastAssistantId && !isStreaming

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Copy, Check, FileText, RotateCcw, Globe } from "lucide-react";
 import { LivePreview } from "@/components/LivePreview";
@@ -9,6 +9,7 @@ import { SearchImagePreloader } from "@/components/SearchImages";
 import { AgentStatusLine } from "@/components/AgentStatusLine";
 import { DebugPanel } from "@/components/DebugPanel";
 import { cleanSearchResponse, plainSearchResponse } from "@/lib/search/citations";
+import { embedWidgetHtml } from "@/lib/widget";
 import { formatFileSize } from "@/lib/files";
 import { hasWebPreview } from "@/lib/markdown-code";
 import { useAppStore } from "@/lib/store";
@@ -16,17 +17,20 @@ import type { Message } from "@/types";
 
 interface MessageBubbleProps {
   message: Message;
+  conversationId?: string;
   onRegenerate?: () => void;
   showRegenerate?: boolean;
 }
 
 export function MessageBubble({
   message,
+  conversationId,
   onRegenerate,
   showRegenerate,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const debugMode = useAppStore((s) => s.settings.debugMode);
+  const updateMessage = useAppStore((s) => s.updateMessage);
   const isUser = message.role === "user";
   const previewId = `live-preview-${message.id}`;
   const showLivePreview =
@@ -56,6 +60,17 @@ export function MessageBubble({
     (!isPending || (hasWidgetOpen && !!assistantContent));
   const showStatus =
     message.isStreaming && !assistantContent && message.agentStatus;
+
+  const handleWidgetBuilt = useCallback(
+    (widgetIndex: number, html: string) => {
+      if (!conversationId || !message.content) return;
+      const updated = embedWidgetHtml(message.content, widgetIndex, html);
+      if (updated !== message.content) {
+        updateMessage(conversationId, message.id, { content: updated });
+      }
+    },
+    [conversationId, message.content, message.id, updateMessage]
+  );
 
   const copy = async () => {
     const text = !isUser && message.content
@@ -170,6 +185,7 @@ export function MessageBubble({
                     }
                     streamComplete={!message.isStreaming}
                     model={message.model}
+                    onWidgetBuilt={handleWidgetBuilt}
                   />
                   {showLivePreview && (
                     <LivePreview
