@@ -6,7 +6,6 @@ import type {
   MessageSearchMeta,
   SearchMode,
 } from "@/types";
-import { isBrowserLoopbackHost } from "@/lib/ollama-hosts";
 
 /**
  * All Ollama traffic goes through Next.js proxy routes.
@@ -53,36 +52,16 @@ export type AgentStreamEvent =
 
 export async function fetchModels(
   host: string,
-  apiKey = ""
+  apiKey = "",
+  localHost = "http://127.0.0.1:11434"
 ): Promise<OllamaTagsResponse> {
-  const normalizedHost = host.replace(/\/+$/, "");
-
-  // Original Redstone fetched /api/tags directly from the browser. That still
-  // works when Ollama is on the same machine (localhost) and returns the full
-  // list without going through the Next.js proxy or tunnel.
-  if (typeof window !== "undefined" && isBrowserLoopbackHost(normalizedHost)) {
-    try {
-      const headers: Record<string, string> = {};
-      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-      const direct = await fetch(`${normalizedHost}/api/tags`, {
-        headers,
-        cache: "no-store",
-      });
-      if (direct.ok) {
-        const data = (await direct.json()) as OllamaTagsResponse;
-        if (Array.isArray(data.models) && data.models.length > 0) {
-          return data;
-        }
-      }
-    } catch {
-      // CORS or unreachable — fall through to server proxy
-    }
-  }
-
   const res = await fetch("/api/models", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(proxyBody(host, apiKey)),
+    body: JSON.stringify({
+      ...proxyBody(host, apiKey),
+      _localHost: localHost,
+    }),
     cache: "no-store",
   });
 

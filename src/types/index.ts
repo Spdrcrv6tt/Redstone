@@ -155,6 +155,7 @@ export interface OllamaChatResponseChunk {
 
 export interface AppSettings {
   ollamaHost: string;
+  localOllamaHost: string;
   apiKey: string;
   braveApiKey: string;
   defaultModel: string;

@@ -30,7 +30,7 @@ export async function loadModelsFromOllama() {
   setModelsError(null);
 
   try {
-    const data = await fetchModels(settings.ollamaHost, settings.apiKey);
+    const data = await fetchModels(settings.ollamaHost, settings.apiKey, settings.localOllamaHost);
     if (seq !== loadSeq) return;
 
     const list = Array.isArray(data.models) ? data.models : [];

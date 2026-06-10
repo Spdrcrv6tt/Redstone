@@ -178,7 +178,7 @@ export function SettingsModal() {
               <section>
                 <p className="settings-section-title">Connection</p>
                 <div className="space-y-4">
-                  <Field label="Ollama host" icon={Server}>
+                  <Field label="Ollama host (tunnel / remote)" icon={Server}>
                     <input
                       type="text"
                       value={local.ollamaHost}
@@ -186,9 +186,24 @@ export function SettingsModal() {
                         setLocal((l) => ({ ...l, ollamaHost: e.target.value }))
                       }
                       className="field-input font-mono text-[13px]"
-                      placeholder="http://localhost:11434"
+                      placeholder="https://ollama.deoxylabs.com"
                       spellCheck={false}
                     />
+                    <Hint>Used for remote access. Set to your Cloudflare tunnel URL.</Hint>
+                  </Field>
+
+                  <Field label="Local Ollama host (same machine)" icon={Server}>
+                    <input
+                      type="text"
+                      value={local.localOllamaHost}
+                      onChange={(e) =>
+                        setLocal((l) => ({ ...l, localOllamaHost: e.target.value }))
+                      }
+                      className="field-input font-mono text-[13px]"
+                      placeholder="http://127.0.0.1:11434"
+                      spellCheck={false}
+                    />
+                    <Hint>The server queries this directly to get the full model list. Set to your Ollama port if models are missing.</Hint>
                   </Field>
 
                   <Field label="Ollama API key" icon={KeyRound}>

@@ -53,6 +53,7 @@ export const PREFERRED_DEFAULT_MODEL = "gemma4:12b";
 
 const DEFAULT_SETTINGS: AppSettings = {
   ollamaHost: "https://ollama.deoxylabs.com",
+  localOllamaHost: "http://127.0.0.1:11434",
   apiKey: "",
   braveApiKey: "",
   defaultModel: PREFERRED_DEFAULT_MODEL,
@@ -213,6 +214,8 @@ export const useAppStore = create<AppState>()(
               saved.settings?.searchMode || DEFAULT_SETTINGS.searchMode,
             debugMode:
               saved.settings?.debugMode ?? DEFAULT_SETTINGS.debugMode,
+            localOllamaHost:
+              saved.settings?.localOllamaHost ?? DEFAULT_SETTINGS.localOllamaHost,
           },
         };
       },
