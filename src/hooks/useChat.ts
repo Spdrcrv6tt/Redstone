@@ -63,7 +63,7 @@ async function streamResponse(
 
   updateMessage(conversationId, assistantId, {
     search: { query: "", sources: [], images: [], videos: [], links: [] },
-    agentStatus: undefined,
+    agentStatus: { redstone_status: "routing", message: "Thinking…" },
   });
 
   const generator = streamAgent(

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Copy, Check, FileText, RotateCcw, Globe } from "lucide-react";
+import { Copy, Check, FileText, RotateCcw } from "lucide-react";
 import { LivePreview } from "@/components/LivePreview";
 import { AssistantArticle } from "@/components/AssistantArticle";
 import { SearchImagePreloader } from "@/components/SearchImages";
@@ -65,9 +65,6 @@ export function MessageBubble({
   const canRevealBody =
     !!assistantContent &&
     (!isPending || (hasRichBlockOpen && !!assistantContent));
-  const showStatus =
-    message.isStreaming && !assistantContent && message.agentStatus;
-
   const handleWidgetBuilt = useCallback(
     (widgetIndex: number, html: string) => {
       if (!conversationId || !message.content) return;
@@ -227,28 +224,9 @@ export function MessageBubble({
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}
                 >
-                  {showStatus && message.agentStatus ? (
-                    <AgentStatusLine status={message.agentStatus} />
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-[11px] text-muted flex items-center gap-1.5">
-                        <Globe className="w-3 h-3 text-indigo-500 animate-pulse" />
-                        Thinking…
-                      </p>
-                      <div className="flex gap-1.5">
-                        {[0, 160, 320].map((delay) => (
-                          <span
-                            key={delay}
-                            className="w-2 h-2 rounded-full"
-                            style={{
-                              backgroundColor: "var(--text-muted)",
-                              animation: `dot-pulse 1.4s ease-in-out ${delay}ms infinite`,
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <AgentStatusLine
+                    message={message.agentStatus?.message ?? "Thinking…"}
+                  />
                 </motion.div>
               ) : null}
             </AnimatePresence>

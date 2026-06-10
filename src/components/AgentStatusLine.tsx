@@ -1,12 +1,10 @@
 "use client";
 
-import type { AgentStatusMeta } from "@/types";
-
 interface AgentStatusLineProps {
-  status: AgentStatusMeta;
+  message: string;
 }
 
-export function AgentStatusLine({ status }: AgentStatusLineProps) {
+export function AgentStatusLine({ message }: AgentStatusLineProps) {
   return (
     <div className="agent-status-line" role="status" aria-live="polite">
       <span className="agent-status-dots" aria-hidden="true">
@@ -18,7 +16,7 @@ export function AgentStatusLine({ status }: AgentStatusLineProps) {
           />
         ))}
       </span>
-      <span className="agent-status-text">{status.message}</span>
+      <span className="agent-status-text">{message}</span>
     </div>
   );
 }
