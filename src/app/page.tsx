@@ -143,54 +143,72 @@ export default function Home() {
                   !isChat ? "landing-shell" : "",
                 ].join(" ")}
               >
-              {isChat && (
-                <motion.div
-                  className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  <div className="chat-thread-wrap mx-auto w-full px-3 sm:px-6 pt-4 md:pt-10 pb-4">
-                    {messages.map((msg) => (
-                      <MessageBubble
-                        key={msg.id}
-                        message={msg}
-                        conversationId={activeConversationId ?? undefined}
-                        onRegenerate={regenerate}
-                        showRegenerate={
-                          msg.id === lastAssistantId && !isStreaming
-                        }
+                {isChat ? (
+                  <>
+                    <motion.div
+                      className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <div className="chat-thread-wrap mx-auto w-full px-3 sm:px-6 pt-4 md:pt-10 pb-4">
+                        {messages.map((msg) => (
+                          <MessageBubble
+                            key={msg.id}
+                            message={msg}
+                            conversationId={activeConversationId ?? undefined}
+                            onRegenerate={regenerate}
+                            showRegenerate={
+                              msg.id === lastAssistantId && !isStreaming
+                            }
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      layout
+                      layoutId="chat-composer"
+                      transition={COMPOSER_SPRING}
+                      className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
+                    >
+                      <InputComposer
+                        key={composerKey}
+                        onSend={handleSend}
+                        onStop={stop}
+                        isStreaming={isStreaming}
+                        autoFocus={!isMobile}
+                        placeholder={isMobile ? "Ask" : "Ask anything"}
+                        onDraftChange={handleDraftChange}
                       />
-                    ))}
-                  </div>
-                </motion.div>
-              )}
+                    </motion.div>
+                  </>
+                ) : (
+                  <>
+                    <div className="landing-splash-slot">
+                      <AnimatePresence mode="wait">
+                        {showSplash ? <LandingGreeting key="splash" /> : null}
+                      </AnimatePresence>
+                    </div>
 
-              {!isChat && (
-                <>
-                  <AnimatePresence mode="wait">
-                    {showSplash ? <LandingGreeting key="splash" /> : null}
-                  </AnimatePresence>
-                  {showSplash ? <div className="landing-composer-spacer" /> : null}
-                </>
-              )}
+                    <motion.div
+                      layoutId="chat-composer"
+                      className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
+                    >
+                      <InputComposer
+                        key={composerKey}
+                        onSend={handleSend}
+                        onStop={stop}
+                        isStreaming={isStreaming}
+                        autoFocus={!isMobile}
+                        placeholder={isMobile ? "Ask" : "Ask anything"}
+                        onDraftChange={handleDraftChange}
+                      />
+                    </motion.div>
 
-              <motion.div
-                layout
-                layoutId="chat-composer"
-                transition={COMPOSER_SPRING}
-                className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
-              >
-                <InputComposer
-                  key={composerKey}
-                  onSend={handleSend}
-                  onStop={stop}
-                  isStreaming={isStreaming}
-                  autoFocus={!isMobile}
-                  placeholder={isMobile ? "Ask" : "Ask anything"}
-                  onDraftChange={handleDraftChange}
-                />
-              </motion.div>
+                    <div className="landing-balance-slot" aria-hidden />
+                  </>
+                )}
               </div>
             </div>
           </main>
