@@ -27,7 +27,8 @@ export function WorkspaceView({
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 });
   const paneSizeRef = useRef({ width: 800, height: 600 });
 
-  const { sendMessage, stop, isStreaming } = useWorkspaceChat(conversationId);
+  const { sendMessage, stop, isStreaming, isThinking } =
+    useWorkspaceChat(conversationId);
 
   const handleViewportChange = useCallback(
     (viewport: Viewport, width: number, height: number) => {
@@ -64,35 +65,27 @@ export function WorkspaceView({
   );
 
   return (
-    <div className="workspace-view flex flex-col flex-1 min-h-0 min-w-0">
-      <div className="workspace-toolbar flex items-center justify-end gap-3 px-3 sm:px-5 py-2 flex-shrink-0 border-b border-theme">
-        <p className="workspace-toolbar-hint text-xs text-muted">
-          Pan the canvas — the agent only sees cards in your viewport
-        </p>
-      </div>
-
+    <div className="workspace-view">
       <WorkspaceCanvas
         conversationId={conversationId}
         onViewportChange={handleViewportChange}
       />
 
       <motion.div
-        className="workspace-composer-wrap flex-shrink-0 w-full mx-auto border-t border-theme"
-        initial={{ opacity: 0, y: 8 }}
+        className="workspace-composer-overlay"
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
       >
         <InputComposer
           key={conversationId}
           onSend={handleSend}
           onStop={stop}
           isStreaming={isStreaming}
+          isThinking={isThinking}
+          layout="canvas"
           autoFocus={!isMobile}
-          placeholder={
-            isMobile
-              ? "Instruct the canvas…"
-              : "Instruct the canvas — spatial context follows your viewport"
-          }
+          placeholder="Instruct the canvas…"
         />
       </motion.div>
     </div>

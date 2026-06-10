@@ -27,6 +27,8 @@ interface InputComposerProps {
   onSend: (message: string, attachments: MessageAttachment[]) => void;
   onStop: () => void;
   isStreaming: boolean;
+  isThinking?: boolean;
+  layout?: "default" | "canvas";
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
@@ -37,6 +39,8 @@ export function InputComposer({
   onSend,
   onStop,
   isStreaming,
+  isThinking = false,
+  layout = "default",
   disabled,
   placeholder = "Ask anything",
   autoFocus,
@@ -171,6 +175,7 @@ export function InputComposer({
         <div
           className={[
             "relative rounded-[28px] composer-surface transition-all duration-300",
+            isThinking ? "composer-surface--thinking" : "",
             dragOver ? "ring-2 ring-indigo-300/60" : "",
             blocked && !loading ? "opacity-60" : "",
           ].join(" ")}
@@ -358,9 +363,11 @@ export function InputComposer({
         </div>
       </div>
 
-      <p className="text-center text-[11px] text-muted/80 mt-3 px-4 tracking-wide">
-        Redstone can make mistakes — verify important information.
-      </p>
+      {layout === "default" ? (
+        <p className="text-center text-[11px] text-muted/80 mt-3 px-4 tracking-wide">
+          Redstone can make mistakes — verify important information.
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ImageIcon } from "lucide-react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -15,13 +16,16 @@ import {
   type OnEdgesChange,
   type OnMove,
   type OnNodesChange,
+  type ReactFlowInstance,
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { CanvasCardNode } from "@/components/workspace/nodes/CanvasCardNode";
 import { EMPTY_CANVAS } from "@/lib/canvas/defaults";
+import { MAX_FILES, processFile } from "@/lib/files";
 import { useAppStore } from "@/lib/store";
-import type { CanvasCardData, CanvasDocument } from "@/types/canvas";
+import { generateId } from "@/lib/utils";
+import type { CanvasCardData, CanvasDocument, CanvasPatch } from "@/types/canvas";
 
 const nodeTypes = { canvasCard: CanvasCardNode };
 
@@ -66,6 +70,14 @@ function WorkspaceCanvasInner({
     (s) => s.conversations.find((c) => c.id === conversationId)?.canvas
   );
   const setCanvasDocument = useAppStore((s) => s.setCanvasDocument);
+  const applyCanvasPatches = useAppStore((s) => s.applyCanvasPatches);
+
+  const flowRef = useRef<ReactFlowInstance<
+    Node<CanvasCardData>,
+    Edge
+  > | null>(null);
+  const dragDepthRef = useRef(0);
+  const [dragOver, setDragOver] = useState(false);
 
   const doc = canvas ?? EMPTY_CANVAS;
   const nodes = useMemo(() => mergeFlowNodes(doc), [doc]);
@@ -111,13 +123,102 @@ function WorkspaceCanvasInner({
     [conversationId, doc, onViewportChange, setCanvasDocument]
   );
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0;
+      setDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      dragDepthRef.current = 0;
+      setDragOver(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      if (!files.length || !flowRef.current) return;
+
+      const position = flowRef.current.screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      const patches: CanvasPatch[] = [];
+      let offset = 0;
+
+      for (const file of files.slice(0, MAX_FILES)) {
+        try {
+          const att = await processFile(file);
+          const id = `drop-${generateId()}`;
+          const pos = { x: position.x + offset, y: position.y + offset };
+
+          if (att.previewUrl) {
+            patches.push({
+              op: "place_image",
+              id,
+              position: pos,
+              imageUrl: att.previewUrl,
+              title: att.name,
+            });
+          } else if (att.textContent) {
+            patches.push({
+              op: "create_node",
+              id,
+              kind: "markdown",
+              position: pos,
+              title: att.name,
+              markdown: att.textContent.slice(0, 12000),
+            });
+          }
+          offset += 48;
+        } catch {
+          /* skip unsupported files */
+        }
+      }
+
+      if (patches.length) {
+        applyCanvasPatches(conversationId, patches);
+      }
+    },
+    [applyCanvasPatches, conversationId]
+  );
+
   const hasDraft = doc.draftNodes.length > 0 || doc.draftEdges.length > 0;
 
   return (
-    <div className="workspace-canvas-pane flex-1 min-h-0 relative">
+    <div
+      className="workspace-canvas-pane"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {hasDraft ? (
         <div className="workspace-draft-badge" aria-live="polite">
-          Draft layer active
+          Draft layer
+        </div>
+      ) : null}
+
+      {dragOver ? (
+        <div className="workspace-drop-overlay" aria-hidden>
+          <ImageIcon className="w-5 h-5" strokeWidth={1.75} />
+          <span>Drop to place on canvas</span>
         </div>
       ) : null}
 
@@ -128,6 +229,9 @@ function WorkspaceCanvasInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onMove={onMove}
+        onInit={(instance) => {
+          flowRef.current = instance;
+        }}
         defaultViewport={doc.viewport}
         fitView={nodes.length === 0}
         minZoom={0.15}

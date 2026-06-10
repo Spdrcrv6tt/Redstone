@@ -141,6 +141,7 @@ export default function Home() {
             className={[
               "app-main flex flex-col flex-1 min-w-0 relative isolate overflow-hidden",
               isChat ? "app-main--chat" : "",
+              isCanvasMode ? "app-main--canvas" : "",
             ].join(" ")}
           >
             <AnimatePresence>
@@ -148,10 +149,12 @@ export default function Home() {
             </AnimatePresence>
 
             <div className="app-main-stack relative z-10 flex flex-col flex-1 min-h-0 min-w-0">
-              <MobileTopBar
-                onOpenMenu={() => setMobileNavOpen(true)}
-                onNewChat={handleNewChat}
-              />
+              {!isCanvasMode ? (
+                <MobileTopBar
+                  onOpenMenu={() => setMobileNavOpen(true)}
+                  onNewChat={handleNewChat}
+                />
+              ) : null}
 
               {isCanvasMode ? (
                 activeConversationId ? (

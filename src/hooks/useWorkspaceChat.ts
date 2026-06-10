@@ -1,7 +1,11 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import { parseCanvasPatchesFromText, stripCanvasBlocks } from "@/lib/canvas/protocol";
+import {
+  parseCanvasPatchesFromText,
+  parseStreamingCanvasPatches,
+  stripCanvasBlocks,
+} from "@/lib/canvas/protocol";
 import { buildMessageContent, extractImages } from "@/lib/files";
 import { streamAgent } from "@/lib/ollama";
 import { useAppStore } from "@/lib/store";
@@ -12,7 +16,7 @@ import type {
   OllamaChatMessage,
   AppSettings,
 } from "@/types";
-import type { CanvasViewportContext } from "@/types/canvas";
+import type { CanvasPatch, CanvasViewportContext } from "@/types/canvas";
 
 function toApiMessage(m: Message): OllamaChatMessage {
   const content = buildMessageContent(m.content, m.attachments ?? []);
@@ -37,9 +41,10 @@ async function streamWorkspaceResponse(
     messageId: string,
     patch: Partial<Message>
   ) => void,
-  applyCanvasPatches: (conversationId: string, patches: ReturnType<typeof parseCanvasPatchesFromText>) => void
+  applyCanvasPatches: (conversationId: string, patches: CanvasPatch[]) => void
 ) {
   let accumulated = "";
+  let appliedPatchCount = 0;
   let searchMeta: MessageSearchMeta | undefined = {
     query: "",
     sources: [],
@@ -96,6 +101,16 @@ async function streamWorkspaceResponse(
     const chunk = event.chunk;
     if (chunk.message?.content) {
       accumulated += chunk.message.content;
+
+      const streamingPatches = parseStreamingCanvasPatches(accumulated);
+      if (streamingPatches.length > appliedPatchCount) {
+        applyCanvasPatches(
+          conversationId,
+          streamingPatches.slice(appliedPatchCount)
+        );
+        appliedPatchCount = streamingPatches.length;
+      }
+
       updateMessage(conversationId, assistantId, {
         content: stripCanvasBlocks(accumulated),
         isStreaming: !chunk.done,
@@ -105,8 +120,11 @@ async function streamWorkspaceResponse(
     }
     if (chunk.done) {
       const patches = parseCanvasPatchesFromText(accumulated);
-      if (patches.length) {
-        applyCanvasPatches(conversationId, patches);
+      if (patches.length > appliedPatchCount) {
+        applyCanvasPatches(
+          conversationId,
+          patches.slice(appliedPatchCount)
+        );
       }
       updateMessage(conversationId, assistantId, {
         content: stripCanvasBlocks(accumulated),
@@ -131,6 +149,10 @@ export function useWorkspaceChat(conversationId: string | null) {
 
   const conversation = conversations.find((c) => c.id === conversationId);
   const isStreaming = conversation?.messages.some((m) => m.isStreaming) ?? false;
+  const isThinking =
+    conversation?.messages.some(
+      (m) => m.isStreaming || !!m.agentStatus
+    ) ?? false;
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -212,5 +234,5 @@ export function useWorkspaceChat(conversationId: string | null) {
     ]
   );
 
-  return { sendMessage, stop, isStreaming, conversation };
+  return { sendMessage, stop, isStreaming, isThinking, conversation };
 }
