@@ -2,8 +2,10 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { EMPTY_CANVAS } from "@/lib/canvas/defaults";
+import { applyCanvasPatches } from "@/lib/canvas/patches";
 import type { Conversation, Message, AppSettings, OllamaModel } from "@/types";
-import type { Theme } from "@/types";
+import type { CanvasDocument, CanvasPatch, EngineMode, Theme } from "@/types";
 import { generateId } from "@/lib/utils";
 import { generateTitle } from "@/lib/ollama";
 
@@ -22,6 +24,7 @@ interface AppState {
 
   // ui
   theme: Theme;
+  engineMode: EngineMode;
   sidebarExpanded: boolean;
   settingsOpen: boolean;
 
@@ -47,6 +50,10 @@ interface AppState {
   setSidebarExpanded: (expanded: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
 
+  setEngineMode: (mode: EngineMode) => void;
+  getCanvas: (conversationId: string) => CanvasDocument;
+  setCanvasDocument: (conversationId: string, canvas: CanvasDocument) => void;
+  applyCanvasPatches: (conversationId: string, patches: CanvasPatch[]) => void;
 }
 
 export const PREFERRED_DEFAULT_MODEL = "gemma4:12b";
@@ -75,6 +82,7 @@ export const useAppStore = create<AppState>()(
       modelsError: null,
       settings: DEFAULT_SETTINGS,
       theme: "light",
+      engineMode: "chat",
       sidebarExpanded: false,
       settingsOpen: false,
 
@@ -185,6 +193,34 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ sidebarExpanded: !s.sidebarExpanded })),
       setSidebarExpanded: (expanded) => set({ sidebarExpanded: expanded }),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+      setEngineMode: (mode) => set({ engineMode: mode }),
+
+      getCanvas: (conversationId) => {
+        const conv = get().conversations.find((c) => c.id === conversationId);
+        return conv?.canvas ?? EMPTY_CANVAS;
+      },
+
+      setCanvasDocument: (conversationId, canvas) => {
+        set((s) => ({
+          conversations: s.conversations.map((c) =>
+            c.id === conversationId
+              ? { ...c, canvas, updatedAt: Date.now() }
+              : c
+          ),
+        }));
+      },
+
+      applyCanvasPatches: (conversationId, patches) => {
+        if (!patches.length) return;
+        set((s) => ({
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conversationId) return c;
+            const canvas = applyCanvasPatches(c.canvas ?? EMPTY_CANVAS, patches);
+            return { ...c, canvas, updatedAt: Date.now() };
+          }),
+        }));
+      },
     }),
     {
       name: "redstone-app",
@@ -196,6 +232,7 @@ export const useAppStore = create<AppState>()(
         activeConversationId: s.activeConversationId,
         settings: s.settings,
         theme: s.theme,
+        engineMode: s.engineMode,
       }),
       merge: (persisted, current) => {
         const saved = persisted as Partial<AppState> | undefined;
@@ -204,6 +241,10 @@ export const useAppStore = create<AppState>()(
           ...current,
           ...saved,
           theme: saved.theme ?? current.theme,
+          engineMode:
+            saved.engineMode === "canvas" || saved.engineMode === "chat"
+              ? saved.engineMode
+              : current.engineMode,
           settings: {
             ...DEFAULT_SETTINGS,
             ...saved.settings,

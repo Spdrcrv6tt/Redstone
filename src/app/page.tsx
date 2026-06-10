@@ -13,6 +13,8 @@ import { MessageBubble } from "@/components/MessageBubble";
 import { InputComposer } from "@/components/InputComposer";
 import { SettingsModal } from "@/components/SettingsModal";
 import { AppBootstrap } from "@/components/AppBootstrap";
+import { EngineModeToggle } from "@/components/EngineModeToggle";
+import { WorkspaceView } from "@/components/workspace/WorkspaceView";
 import type { MessageAttachment } from "@/types";
 
 const COMPOSER_SPRING = { type: "spring" as const, stiffness: 380, damping: 38 };
@@ -30,13 +32,16 @@ export default function Home() {
     createConversation,
     setActiveConversation,
     setSidebarExpanded,
+    engineMode,
   } = useAppStore();
+
+  const isCanvasMode = engineMode === "canvas";
 
   const conversation = conversations.find((c) => c.id === activeConversationId);
   const messages = conversation?.messages ?? [];
   const isStreaming = messages.some((m) => m.isStreaming);
   const isChat = messages.length > 0;
-  const showAurora = !isChat;
+  const showAurora = !isChat && !isCanvasMode;
   const showSplash =
     !isChat && !composerDraft.trim() && !composerHasAttachments;
 
@@ -91,6 +96,18 @@ export default function Home() {
     [activeConversationId, settings.defaultModel, createConversation, sendMessage]
   );
 
+  const ensureWorkspaceConversation = useCallback(() => {
+    if (activeConversationId) return activeConversationId;
+    if (!settings.defaultModel) return "";
+    return createConversation(settings.defaultModel);
+  }, [activeConversationId, createConversation, settings.defaultModel]);
+
+  useEffect(() => {
+    if (isCanvasMode && !activeConversationId && settings.defaultModel) {
+      createConversation(settings.defaultModel);
+    }
+  }, [isCanvasMode, activeConversationId, settings.defaultModel, createConversation]);
+
   const handleNewChat = useCallback(() => {
     setActiveConversation(null);
     setSidebarExpanded(false);
@@ -137,12 +154,29 @@ export default function Home() {
                 onNewChat={handleNewChat}
               />
 
+              {isCanvasMode ? (
+                activeConversationId ? (
+                  <WorkspaceView
+                    conversationId={activeConversationId}
+                    onEnsureConversation={ensureWorkspaceConversation}
+                    isMobile={isMobile}
+                  />
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-sm text-muted">
+                    Opening workspace…
+                  </div>
+                )
+              ) : (
               <div
                 className={[
                   "flex-1 flex flex-col min-h-0",
                   !isChat ? "landing-shell" : "",
                 ].join(" ")}
               >
+                <div className="hidden md:flex justify-center pt-3 px-4 flex-shrink-0">
+                  <EngineModeToggle />
+                </div>
+
                 {isChat ? (
                   <>
                     <motion.div
@@ -210,6 +244,7 @@ export default function Home() {
                   </>
                 )}
               </div>
+              )}
             </div>
           </main>
         </div>

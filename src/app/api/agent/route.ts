@@ -27,9 +27,14 @@ import {
   buildQuizSystemPrompt,
 } from "@/lib/search/prompt";
 import {
+  CANVAS_ARCHITECT_CORE,
+  formatCanvasViewportContext,
+} from "@/lib/canvas/prompt";
+import {
   encodeMetaLine,
   encodeStatusLine,
 } from "@/lib/search/stream-protocol";
+import type { CanvasViewportContext } from "@/types/canvas";
 import type { OllamaChatMessage } from "@/types";
 import type {
   AgentPipelineStatus,
@@ -381,6 +386,8 @@ export async function POST(req: NextRequest) {
     _searchMode,
     _routerModel: ___,
     _debugMode,
+    _canvasContext,
+    _engineMode,
     ...ollamaBody
   } = body as {
     _host?: string;
@@ -391,6 +398,8 @@ export async function POST(req: NextRequest) {
     _searchMode?: SearchMode;
     _routerModel?: string;
     _debugMode?: boolean;
+    _canvasContext?: CanvasViewportContext;
+    _engineMode?: "chat" | "canvas";
     model?: string;
     messages?: OllamaChatMessage[];
     [key: string]: unknown;
@@ -419,6 +428,11 @@ export async function POST(req: NextRequest) {
   const debugMode = _debugMode === true;
   const userSystemPrompt =
     typeof _systemPrompt === "string" ? _systemPrompt : "";
+  const engineMode = _engineMode === "canvas" ? "canvas" : "chat";
+  const canvasContext =
+    _canvasContext && typeof _canvasContext === "object"
+      ? (_canvasContext as CanvasViewportContext)
+      : undefined;
 
   const encoder = new TextEncoder();
 
@@ -442,6 +456,23 @@ export async function POST(req: NextRequest) {
           emitStatus,
         });
 
+        let upstreamMessages = pipeline.upstreamMessages;
+
+        if (engineMode === "canvas") {
+          const viewportBlock = canvasContext
+            ? `\n<CANVAS_VIEWPORT>\n${formatCanvasViewportContext(canvasContext)}\n</CANVAS_VIEWPORT>\n`
+            : "";
+          const canvasSystem = `${CANVAS_ARCHITECT_CORE}${viewportBlock}${
+            userSystemPrompt.trim()
+              ? `\nUser settings:\n${userSystemPrompt.trim()}`
+              : ""
+          }`;
+          upstreamMessages = [
+            { role: "system", content: canvasSystem },
+            ...conversationMessages,
+          ];
+        }
+
         controller.enqueue(encoder.encode(encodeMetaLine(pipeline.meta)));
 
         const upstream = await fetch(`${host}/api/chat`, {
@@ -449,7 +480,7 @@ export async function POST(req: NextRequest) {
           headers: upstreamHeaders(apiKey),
           body: JSON.stringify({
             ...ollamaBody,
-            messages: pipeline.upstreamMessages,
+            messages: upstreamMessages,
             stream: true,
           }),
         });

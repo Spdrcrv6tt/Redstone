@@ -6,6 +6,7 @@ import type {
   MessageSearchMeta,
   SearchMode,
 } from "@/types";
+import type { CanvasViewportContext } from "@/types/canvas";
 
 /**
  * All Ollama traffic goes through Next.js proxy routes.
@@ -22,6 +23,8 @@ function proxyBody(
     priorImageUrls?: string[];
     searchMode?: SearchMode;
     debugMode?: boolean;
+    canvasContext?: CanvasViewportContext;
+    engineMode?: "chat" | "canvas";
   }
 ) {
   return {
@@ -38,6 +41,10 @@ function proxyBody(
       ? { _searchMode: extras.searchMode }
       : {}),
     ...(extras?.debugMode !== undefined ? { _debugMode: extras.debugMode } : {}),
+    ...(extras?.canvasContext
+      ? { _canvasContext: extras.canvasContext }
+      : {}),
+    ...(extras?.engineMode ? { _engineMode: extras.engineMode } : {}),
   };
 }
 
@@ -81,7 +88,9 @@ export async function* streamAgent(
   systemPrompt = "",
   priorImageUrls: string[] = [],
   searchMode: SearchMode = "auto",
-  debugMode = false
+  debugMode = false,
+  canvasContext?: CanvasViewportContext,
+  engineMode: "chat" | "canvas" = "chat"
 ): AsyncGenerator<AgentStreamEvent> {
   const res = await fetch("/api/agent", {
     method: "POST",
@@ -95,6 +104,8 @@ export async function* streamAgent(
         priorImageUrls,
         searchMode,
         debugMode,
+        canvasContext,
+        engineMode,
       }),
     }),
     signal,

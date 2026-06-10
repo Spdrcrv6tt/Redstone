@@ -1,3 +1,12 @@
+import type { CanvasDocument, EngineMode } from "@/types/canvas";
+
+export type {
+  CanvasDocument,
+  CanvasPatch,
+  CanvasViewportContext,
+  EngineMode,
+} from "@/types/canvas";
+
 export type Role = "user" | "assistant" | "system";
 export type Theme = "light" | "dark";
 
@@ -109,6 +118,8 @@ export interface Conversation {
   model: string;
   createdAt: number;
   updatedAt: number;
+  /** Spatial workspace document (canvas mode). */
+  canvas?: CanvasDocument;
 }
 
 export interface OllamaModel {
