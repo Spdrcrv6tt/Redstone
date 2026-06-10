@@ -1015,9 +1015,10 @@ button.source-cite {
 }
 
 .agent-status-dots[data-phase="work"] {
-  width: 1.375rem;
-  height: 1.375rem;
-  transition: width 0.5s ease, height 0.5s ease;
+  width: 1.875rem;
+  height: 1.875rem;
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .agent-status-orbit-track {
@@ -1025,19 +1026,32 @@ button.source-cite {
   display: block;
   width: 100%;
   height: 100%;
-  transform-origin: center center;
+}
+
+.agent-status-glow-halo {
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(0, 229, 255, 0.35) 0%,
+    rgba(255, 26, 92, 0.2) 40%,
+    transparent 72%
+  );
+  filter: blur(6px);
+  pointer-events: none;
 }
 
 .agent-status-dot {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 0.4rem;
-  height: 0.4rem;
-  margin: -0.2rem 0 0 -0.2rem;
+  width: 0.46rem;
+  height: 0.46rem;
+  margin: -0.23rem 0 0 -0.23rem;
   border-radius: 999px;
   background: var(--text-muted);
-  will-change: transform, opacity;
+  will-change: transform, opacity, box-shadow;
 }
 .agent-status-text {
   font-size: 0.8125rem;
