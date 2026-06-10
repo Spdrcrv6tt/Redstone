@@ -83,22 +83,13 @@ export async function executeWebSearches(
   return mergeSearchSources(batches.flat());
 }
 
-/** Pull plain-text Wikipedia extract for list-style answers. */
-export async function enrichSourcesForList(
-  sources: SearchSource[]
-): Promise<SearchSource[]> {
-  const wiki = sources.find(
-    (s) =>
-      /wikipedia\.org/i.test(s.url) &&
-      (/list of/i.test(`${s.title} ${s.url}`) ||
-        /-class/i.test(`${s.title} ${s.url}`))
-  );
-  if (!wiki) return sources;
+async function fetchWikipediaExtract(url: string): Promise<string | null> {
+  if (!/wikipedia\.org\/wiki\//i.test(url)) return null;
 
   const title = decodeURIComponent(
-    wiki.url.split("/wiki/")[1]?.replace(/_/g, " ") ?? ""
+    url.split("/wiki/")[1]?.split("#")[0]?.replace(/_/g, " ") ?? ""
   );
-  if (!title) return sources;
+  if (!title) return null;
 
   try {
     const api = new URL("https://en.wikipedia.org/w/api.php");
@@ -112,27 +103,66 @@ export async function enrichSourcesForList(
       signal: AbortSignal.timeout(8000),
       cache: "no-store",
     });
-    if (!res.ok) return sources;
+    if (!res.ok) return null;
 
     const data = (await res.json()) as {
       query?: { pages?: Record<string, { extract?: string }> };
     };
-    const page = Object.values(data.query?.pages ?? {})[0];
-    const extract = page?.extract?.trim();
-    if (!extract || extract.length < 200) return sources;
-
-    return sources.map((s) =>
-      s.url === wiki.url
-        ? {
-            ...s,
-            title: `${s.title} (Wikipedia extract)`,
-            snippet: extract.slice(0, 18000),
-          }
-        : s
-    );
+    const extract = Object.values(data.query?.pages ?? {})[0]?.extract?.trim();
+    return extract && extract.length >= 200 ? extract : null;
   } catch {
-    return sources;
+    return null;
   }
+}
+
+/** Replace thin Brave preview snippets with full Wikipedia article text. */
+export async function enrichSourcesWithDeepContent(
+  sources: SearchSource[],
+  maxDepth = 4
+): Promise<SearchSource[]> {
+  const enriched = await Promise.all(
+    sources.slice(0, maxDepth).map(async (source) => {
+      if (source.snippet.length >= 300) return source;
+      if (!/wikipedia\.org/i.test(source.url)) return source;
+
+      const extract = await fetchWikipediaExtract(source.url);
+      if (!extract) return source;
+
+      return {
+        ...source,
+        title: `${source.title} (Wikipedia extract)`,
+        snippet: extract.slice(0, 8000),
+      };
+    })
+  );
+
+  return [...enriched, ...sources.slice(maxDepth)];
+}
+
+/** Pull plain-text Wikipedia extract for list-style answers. */
+export async function enrichSourcesForList(
+  sources: SearchSource[]
+): Promise<SearchSource[]> {
+  const wiki = sources.find(
+    (s) =>
+      /wikipedia\.org/i.test(s.url) &&
+      (/list of/i.test(`${s.title} ${s.url}`) ||
+        /-class/i.test(`${s.title} ${s.url}`))
+  );
+  if (!wiki) return sources;
+
+  const extract = await fetchWikipediaExtract(wiki.url);
+  if (!extract) return sources;
+
+  return sources.map((s) =>
+    s.url === wiki.url
+      ? {
+          ...s,
+          title: `${s.title} (Wikipedia extract)`,
+          snippet: extract.slice(0, 18000),
+        }
+      : s
+  );
 }
 
 export async function braveWebSearch(

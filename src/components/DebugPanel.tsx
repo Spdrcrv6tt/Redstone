@@ -116,18 +116,12 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
       )}
 
       {debug?.upstreamMessages && (
-        <Section title="Sent to model">
+        <Section title="Sent to model" defaultOpen>
           <MonoBlock
             text={debug.upstreamMessages
               .map((m) => `--- ${m.role.toUpperCase()} ---\n${m.content}`)
               .join("\n\n")}
           />
-        </Section>
-      )}
-
-      {debug?.systemPrompt && (
-        <Section title="System prompt">
-          <MonoBlock text={debug.systemPrompt} />
         </Section>
       )}
 

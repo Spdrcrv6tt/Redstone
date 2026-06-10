@@ -8,8 +8,10 @@ import {
   executeSearch,
   executeWebSearches,
   enrichSourcesForList,
+  enrichSourcesWithDeepContent,
   resolveBraveApiKey,
 } from "@/lib/search/brave";
+import { enhanceSearchQuery } from "@/lib/search/query-enhance";
 import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
 import {
   imagePlanFromOrchestrator,
@@ -65,19 +67,6 @@ const BLACKLISTED_SOURCE_DOMAINS = [
   "memory-beta.fandom.com",
 ];
 
-/** Append authoritative domain filters for niche queries before Brave execution. */
-function applyDomainFiltersToQuery(query: string): string {
-  let finalSearchQuery = query.trim();
-  const lower = finalSearchQuery.toLowerCase();
-
-  if (lower.includes("enterprise") || lower.includes("star trek")) {
-    finalSearchQuery +=
-      " site:en.wikipedia.org OR site:memory-alpha.fandom.com";
-  }
-
-  return finalSearchQuery;
-}
-
 function filterBlacklistedSources(sources: SearchSource[]): SearchSource[] {
   return sources.filter((source) => {
     try {
@@ -101,6 +90,7 @@ interface PipelineInput {
   searchMode: SearchMode;
   routerModel: string;
   debugMode: boolean;
+  userSystemPrompt: string;
   emitStatus: StatusEmitter;
 }
 
@@ -121,6 +111,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     searchMode,
     routerModel,
     debugMode,
+    userSystemPrompt,
     emitStatus,
   } = input;
 
@@ -236,7 +227,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 
   const webQuery =
     overrideWebQuery || draftPlan.webSearchQuery;
-  const finalSearchQuery = applyDomainFiltersToQuery(webQuery);
+  const finalSearchQuery = enhanceSearchQuery(webQuery);
 
   if (runWebSearch && finalSearchQuery && braveKey) {
     emitStatus("searching", "Querying live web endpoints...");
@@ -244,8 +235,8 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     try {
       if (draftPlan.exhaustiveList && !overrideWebQuery) {
         const queries = [
-          applyDomainFiltersToQuery(draftPlan.webSearchQuery),
-          ...draftPlan.supplementalWebQueries.map(applyDomainFiltersToQuery),
+          enhanceSearchQuery(draftPlan.webSearchQuery),
+          ...draftPlan.supplementalWebQueries.map(enhanceSearchQuery),
         ];
         sources = await executeWebSearches(queries, braveKey, 10);
         sources = await enrichSourcesForList(sources);
@@ -255,6 +246,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
         searchError = webOnly.searchError;
       }
       sources = filterBlacklistedSources(sources);
+      sources = await enrichSourcesWithDeepContent(sources);
     } catch (err) {
       searchError =
         err instanceof Error ? err.message : "Web search failed";
@@ -295,7 +287,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   emitStatus("injecting", "Purifying and binding verified context...");
 
   const systemContent = buildAugmentedSystemPrompt(
-    "",
+    userSystemPrompt,
     turnPlan,
     sources,
     visualMode,
@@ -326,7 +318,6 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     ...(debugMode
       ? {
           debug: {
-            systemPrompt: systemContent,
             upstreamMessages,
             ...(searchMs !== undefined ? { searchMs } : {}),
             ...(imageMs !== undefined ? { imageMs } : {}),
@@ -418,18 +409,9 @@ export async function POST(req: NextRequest) {
           searchMode,
           routerModel,
           debugMode,
+          userSystemPrompt,
           emitStatus,
         });
-
-        if (userSystemPrompt.trim()) {
-          const sys = pipeline.upstreamMessages[0];
-          if (sys?.role === "system") {
-            sys.content = `${sys.content}\n\nUser settings:\n${userSystemPrompt.trim()}`;
-            if (pipeline.meta.debug) {
-              pipeline.meta.debug.systemPrompt = sys.content;
-            }
-          }
-        }
 
         controller.enqueue(encoder.encode(encodeMetaLine(pipeline.meta)));
 

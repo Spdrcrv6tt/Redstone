@@ -64,7 +64,8 @@ export interface SearchDecisionMeta {
 }
 
 export interface TurnDebugMeta {
-  systemPrompt: string;
+  /** Deprecated: use upstreamMessages[0] — kept optional to avoid duplicate payloads. */
+  systemPrompt?: string;
   upstreamMessages: OllamaChatMessage[];
   searchMs?: number;
   imageMs?: number;
