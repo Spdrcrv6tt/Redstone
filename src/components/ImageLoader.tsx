@@ -112,18 +112,12 @@ export function ImageLoader({
   }
 
   if (error) {
-    return (
-      <ImageGenerationPanel
-        stage="error"
-        error={error}
-        showPipeline={false}
-      />
-    );
+    return <ImageGenerationPanel stage="error" error={error} />;
   }
 
   return <ImageGenerationPanel stage={statusToStage(status)} />;
 }
 
 export function ImageArchitectPending() {
-  return <ImageGenerationPanel stage="architect" showPipeline={false} />;
+  return <ImageGenerationPanel stage="architect" />;
 }
