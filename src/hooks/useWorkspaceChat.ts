@@ -66,7 +66,7 @@ async function streamWorkspaceResponse(
       stream: true,
       options: {
         temperature: settings.temperature,
-        num_ctx: 16384,
+        num_ctx: settings.numCtx,
         num_predict: 4096,
       },
     },

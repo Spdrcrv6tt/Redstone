@@ -199,6 +199,8 @@ export interface AppSettings {
   streamResponses: boolean;
   systemPrompt: string;
   temperature: number;
+  /** Ollama `num_ctx` — max tokens in the model context window. */
+  numCtx: number;
   displayName: string;
   thinkingOrbs: ThinkingOrbSettings;
 }

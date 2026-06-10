@@ -17,6 +17,10 @@ import type {
   CanvasPatch,
 } from "@/types/canvas";
 import {
+  DEFAULT_NUM_CTX,
+  normalizeNumCtx,
+} from "@/lib/context-window";
+import {
   DEFAULT_THINKING_ORBS,
   normalizeThinkingOrbs,
 } from "@/lib/thinking-orbs";
@@ -97,6 +101,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   streamResponses: true,
   systemPrompt: "",
   temperature: 0.7,
+  numCtx: DEFAULT_NUM_CTX,
   displayName: "",
   thinkingOrbs: DEFAULT_THINKING_ORBS,
 };
@@ -364,6 +369,7 @@ export const useAppStore = create<AppState>()(
             localOllamaHost:
               saved.settings?.localOllamaHost ?? DEFAULT_SETTINGS.localOllamaHost,
             thinkingOrbs: normalizeThinkingOrbs(saved.settings?.thinkingOrbs),
+            numCtx: normalizeNumCtx(saved.settings?.numCtx),
           },
         };
       },

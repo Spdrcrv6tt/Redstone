@@ -17,7 +17,16 @@ import {
   Globe,
   Bug,
   LogOut,
+  Layers,
 } from "lucide-react";
+import {
+  DEFAULT_NUM_CTX,
+  formatNumCtx,
+  MAX_NUM_CTX,
+  MIN_NUM_CTX,
+  normalizeNumCtx,
+  NUM_CTX_PRESETS,
+} from "@/lib/context-window";
 import { ModelPicker } from "@/components/ModelPicker";
 import type { SearchMode, Theme, ThinkingOrbPath } from "@/types";
 import { useAppStore } from "@/lib/store";
@@ -52,6 +61,7 @@ export function SettingsModal() {
         thinkingOrbs: normalizeThinkingOrbs(
           settings.thinkingOrbs ?? DEFAULT_THINKING_ORBS
         ),
+        numCtx: normalizeNumCtx(settings.numCtx),
       });
     }
   }, [settingsOpen, settings]);
@@ -69,6 +79,7 @@ export function SettingsModal() {
     updateSettings({
       ...local,
       thinkingOrbs: normalizeThinkingOrbs(local.thinkingOrbs),
+      numCtx: normalizeNumCtx(local.numCtx),
     });
     setSettingsOpen(false);
   };
@@ -564,6 +575,58 @@ export function SettingsModal() {
                         <p className="text-[10px] text-muted">{tempLabel}</p>
                       </div>
                     </div>
+                  </Field>
+
+                  <Field label="Context window" icon={Layers}>
+                    <div className="segmented-control flex-wrap">
+                      {NUM_CTX_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() =>
+                            setLocal((l) => ({ ...l, numCtx: preset }))
+                          }
+                          className={[
+                            "segmented-option",
+                            local.numCtx === preset ? "segmented-option-active" : "",
+                          ].join(" ")}
+                        >
+                          {formatNumCtx(preset)}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center gap-3">
+                      <input
+                        type="number"
+                        min={MIN_NUM_CTX}
+                        max={MAX_NUM_CTX}
+                        step={1024}
+                        value={local.numCtx}
+                        onChange={(e) =>
+                          setLocal((l) => ({
+                            ...l,
+                            numCtx: normalizeNumCtx(e.target.value),
+                          }))
+                        }
+                        className="field-input w-32 tabular-nums"
+                      />
+                      <span className="text-xs text-muted">tokens</span>
+                      {local.numCtx !== DEFAULT_NUM_CTX ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLocal((l) => ({ ...l, numCtx: DEFAULT_NUM_CTX }))
+                          }
+                          className="text-xs text-muted hover:text-primary transition-colors ml-auto"
+                        >
+                          Reset to {formatNumCtx(DEFAULT_NUM_CTX)}
+                        </button>
+                      ) : null}
+                    </div>
+                    <Hint>
+                      Passed to Ollama as <code className="text-[10px]">num_ctx</code>.
+                      Higher values keep more chat history but use more VRAM.
+                    </Hint>
                   </Field>
 
                   <Field label="System prompt" icon={MessageSquare}>
