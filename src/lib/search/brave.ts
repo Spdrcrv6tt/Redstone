@@ -84,6 +84,193 @@ export async function executeWebSearches(
   return mergeSearchSources(batches.flat());
 }
 
+const LEXICAL_STOP_WORDS = new Set([
+  "what",
+  "were",
+  "was",
+  "the",
+  "and",
+  "for",
+  "about",
+  "tell",
+  "give",
+  "list",
+  "who",
+  "when",
+  "where",
+  "how",
+  "why",
+  "that",
+  "this",
+  "with",
+  "from",
+  "have",
+  "has",
+  "had",
+  "are",
+  "is",
+  "of",
+  "in",
+  "on",
+  "at",
+  "to",
+  "a",
+  "an",
+  "walk",
+  "through",
+  "during",
+  "me",
+  "official",
+  "summary",
+  "site",
+  "nasa",
+  "gov",
+  "org",
+  "wikipedia",
+]);
+
+function lexicalTerms(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/site:\S+/g, " ")
+      .replace(/[^\w\s-]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !LEXICAL_STOP_WORDS.has(w))
+  );
+}
+
+/** Split a Wikipedia extract into paragraph chunks for lexical ranking. */
+function splitExtractParagraphs(text: string): string[] {
+  const raw = text
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const merged: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const block = raw[i] ?? "";
+    const isHeading =
+      block.length < 90 && !/[.,:;!?]/.test(block) && /^[A-Z]/.test(block);
+    const next = raw[i + 1];
+    if (isHeading && next) {
+      merged.push(`${block}\n\n${next}`);
+      i++;
+    } else {
+      merged.push(block);
+    }
+  }
+
+  return merged.filter((p) => p.length >= 50);
+}
+
+/** Expand query terms with closely related words implied by the question. */
+function expandedQueryTerms(query: string): string[] {
+  const base = [...lexicalTerms(query)];
+  const extra: string[] = [];
+  const lower = query.toLowerCase();
+
+  if (/\bexplosion\b/.test(lower)) {
+    extra.push("bang", "accident", "rupture", "oxygen", "tank");
+  }
+  if (/\bsplashdown\b/.test(lower)) {
+    extra.push("reentry", "recovery", "landing", "pacific");
+  }
+  if (/\bcrisis\b/.test(lower)) {
+    extra.push("accident", "emergency", "failure");
+  }
+  if (/\b(timeline|sequence)\b/.test(lower)) {
+    extra.push("hours", "minutes", "after", "approaching");
+  }
+
+  return [...new Set([...base, ...extra])];
+}
+
+function scoreParagraphByQueryTerms(
+  paragraph: string,
+  queryTerms: string[],
+  baseTerms: Set<string>,
+  docFreq: Map<string, number>,
+  corpusSize: number,
+  timelineQuery: boolean,
+  userQuery: string
+): number {
+  const lower = paragraph.toLowerCase();
+  let score = 0;
+
+  for (const term of queryTerms) {
+    if (!lower.includes(term)) continue;
+    const df = docFreq.get(term) ?? 1;
+    const idf = Math.log((corpusSize + 1) / (df + 1)) + 1;
+    const specificity = Math.min(term.length / 4, 2.5);
+    const weight = baseTerms.has(term) ? 1 : 0.6;
+    const occurrences = lower.split(term).length - 1;
+    score += idf * specificity * weight * Math.min(occurrences, 2);
+  }
+
+  if (timelineQuery && /\b\d{1,2}:\d{2}(:\d{2})?\b/.test(paragraph)) {
+    score += 3;
+  }
+
+  if (
+    /\b(movie|film|miniseries|dramatized)\b/i.test(paragraph) &&
+    !/\b(movie|film|miniseries)\b/i.test(userQuery)
+  ) {
+    score *= 0.25;
+  }
+
+  return score;
+}
+
+/**
+ * Rank paragraphs by lexical overlap with the user query (IDF-weighted term
+ * scoring). Returns the top-K highest-scoring chunks instead of the article lead.
+ */
+export function rankExtractParagraphs(
+  text: string,
+  query: string,
+  topK = 4
+): string {
+  const paragraphs = splitExtractParagraphs(text);
+  if (!paragraphs.length) return text.trim();
+  if (paragraphs.length <= topK) return paragraphs.join("\n\n");
+
+  const baseTerms = new Set(lexicalTerms(query));
+  const queryTerms = expandedQueryTerms(query);
+  if (!queryTerms.length) return paragraphs.slice(0, topK).join("\n\n");
+
+  const timelineQuery = needsUnconditionalDeepEnrich(query);
+  const docFreq = new Map<string, number>();
+  for (const term of queryTerms) {
+    docFreq.set(
+      term,
+      paragraphs.filter((p) => p.toLowerCase().includes(term)).length
+    );
+  }
+
+  const scored = paragraphs.map((para, index) => ({
+    para,
+    index,
+    score: scoreParagraphByQueryTerms(
+      para,
+      queryTerms,
+      baseTerms,
+      docFreq,
+      paragraphs.length,
+      timelineQuery,
+      query
+    ),
+  }));
+
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  const top = scored.slice(0, topK).filter((s) => s.score > 0);
+  if (!top.length) {
+    return paragraphs.slice(0, topK).join("\n\n");
+  }
+
+  return top.map((s) => s.para).join("\n\n");
+}
+
 async function fetchWikipediaExtract(url: string): Promise<string | null> {
   if (!/wikipedia\.org\/wiki\//i.test(url)) return null;
 
@@ -148,10 +335,13 @@ export async function enrichSourcesWithDeepContent(
       const extract = await fetchWikipediaExtract(source.url);
       if (!extract) return source;
 
+      const topK = forceDeep ? 6 : 4;
+      const ranked = rankExtractParagraphs(extract, userQuery, topK);
+
       return {
         ...source,
         title: `${source.title} (Wikipedia extract)`,
-        snippet: extract,
+        snippet: ranked,
       };
     })
   );
