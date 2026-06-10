@@ -1,5 +1,6 @@
 import { upstreamHeaders } from "@/lib/proxy";
 import type { ImageSearchPlan } from "@/lib/search/coordinator";
+import type { SearchSource } from "@/types";
 
 export type OrchestratorPhase =
   | "orchestrate"
@@ -159,6 +160,97 @@ export async function runOrchestrator(
   }
 
   return { plan, raw };
+}
+
+// ---------------------------------------------------------------------------
+// Watchdog synopsis — Phase 2
+// ---------------------------------------------------------------------------
+
+const SYNOPSIS_PROMPT = `You are a research assistant for an AI chat system. Your job is to read web search results and write a clean factual briefing for the main AI model that will answer the user's question.
+
+Rules:
+- 3-6 sentences maximum
+- Extract only facts directly relevant to the user's question
+- Include key names, dates, specs, outcomes when present
+- Factual and objective — no opinions or filler
+- Do NOT open with "Based on the search results", "The search results show", or similar
+- Do NOT describe what sources say — just state the facts directly
+- Write as if you already know this and are briefing a colleague`;
+
+export interface WatchdogSynopsisResult {
+  synopsis: string;
+  synopsisMs: number;
+  error?: string;
+}
+
+/**
+ * Second watchdog call: reads search results and writes a concise briefing
+ * for the main model. Replaces the raw source dump in the system prompt.
+ */
+export async function runWatchdogSynopsis(
+  host: string,
+  apiKey: string,
+  model: string,
+  userQuery: string,
+  sources: SearchSource[]
+): Promise<WatchdogSynopsisResult> {
+  const t0 = Date.now();
+
+  if (sources.length === 0) {
+    return { synopsis: "", synopsisMs: 0, error: "no sources to synthesize" };
+  }
+
+  const sourceText = sources
+    .slice(0, 8)
+    .map((s, i) => `[${i + 1}] ${s.title}\n${s.snippet}`)
+    .join("\n\n");
+
+  const content = `User question: "${userQuery.trim()}"\n\nSearch results:\n${sourceText}\n\nWrite a factual research briefing.`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${host}/api/chat`, {
+      method: "POST",
+      headers: upstreamHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        stream: false,
+        think: false,
+        messages: [
+          { role: "user", content: `${SYNOPSIS_PROMPT}\n\n${content}` },
+        ],
+        options: { temperature: 0.1, num_predict: 500, num_ctx: 8192 },
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch (e) {
+    return {
+      synopsis: "",
+      synopsisMs: Date.now() - t0,
+      error: `network error: ${String(e)}`,
+    };
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    return {
+      synopsis: "",
+      synopsisMs: Date.now() - t0,
+      error: `Ollama ${res.status}: ${body.slice(0, 200)}`,
+    };
+  }
+
+  const data = (await res.json()) as {
+    message?: { content?: string };
+    error?: string;
+  };
+
+  if (data.error) {
+    return { synopsis: "", synopsisMs: Date.now() - t0, error: data.error };
+  }
+
+  const synopsis = stripThinking(data.message?.content ?? "").trim();
+  return { synopsis, synopsisMs: Date.now() - t0 };
 }
 
 /** Build image search plan from orchestrator subject string. */

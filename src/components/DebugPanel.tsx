@@ -79,18 +79,29 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
               debug?.imageMs !== undefined
                 ? `Image time: ${debug.imageMs}ms`
                 : null,
+              debug?.synopsisMs !== undefined
+                ? `Synopsis time: ${debug.synopsisMs}ms`
+                : null,
               search?.query ? `Query: ${search.query}` : null,
               decision.orchestrator
                 ? [
-                    `Orchestrator web: ${decision.orchestrator.webSearch}`,
+                    `Watchdog web: ${decision.orchestrator.webSearch}`,
                     decision.orchestrator.webQuery
-                      ? `Orchestrator web query: ${decision.orchestrator.webQuery}`
+                      ? `Watchdog web query: ${decision.orchestrator.webQuery}`
                       : null,
-                    `Orchestrator image: ${decision.orchestrator.imageSearch}`,
+                    `Watchdog image: ${decision.orchestrator.imageSearch}`,
                     decision.orchestrator.imageQuery
-                      ? `Orchestrator image query: ${decision.orchestrator.imageQuery}`
+                      ? `Watchdog image query: ${decision.orchestrator.imageQuery}`
                       : null,
-                  ].join("\n")
+                    decision.orchestrator.synopsis
+                      ? `Watchdog synopsis: ✓ (${decision.orchestrator.synopsis.length} chars)`
+                      : null,
+                    decision.orchestrator.synopsisError
+                      ? `Synopsis error: ${decision.orchestrator.synopsisError}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")
                 : null,
               `Sources: ${search?.sources.length ?? 0}`,
               `Images: ${search?.images.length ?? 0}`,
@@ -98,6 +109,18 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
               .filter(Boolean)
               .join("\n")}
           />
+        </Section>
+      )}
+
+      {decision?.orchestrator?.watchdogRaw && (
+        <Section title="Watchdog decision (raw JSON)">
+          <MonoBlock text={decision.orchestrator.watchdogRaw} />
+        </Section>
+      )}
+
+      {decision?.orchestrator?.synopsis && (
+        <Section title="Watchdog briefing (sent to model)" defaultOpen>
+          <MonoBlock text={decision.orchestrator.synopsis} />
         </Section>
       )}
 

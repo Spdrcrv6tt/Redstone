@@ -44,6 +44,11 @@ export interface OrchestratorDecisionMeta {
   imageSearch: boolean;
   imageQuery: string;
   reason: string;
+  /** Raw model output from the watchdog decision call (debug only). */
+  watchdogRaw?: string;
+  /** Watchdog's synthesis of search results, sent to the main model. */
+  synopsis?: string;
+  synopsisError?: string;
 }
 
 export interface SearchDecisionMeta {
@@ -60,6 +65,7 @@ export interface TurnDebugMeta {
   upstreamMessages: OllamaChatMessage[];
   searchMs?: number;
   imageMs?: number;
+  synopsisMs?: number;
 }
 
 export interface MessageSearchMeta {

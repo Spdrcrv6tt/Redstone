@@ -78,7 +78,9 @@ export function buildAugmentedSystemPrompt(
   sources: SearchSource[],
   visualMode: VisualMode,
   searchError?: string,
-  webSearchRan = true
+  webSearchRan = true,
+  /** When provided (watchdog/aggressive mode), replaces raw source dump. */
+  watchdogSynopsis?: string
 ): string {
   const parts = [
     webSearchRan ? CORE_WITH_SEARCH : CORE_NO_SEARCH,
@@ -107,13 +109,18 @@ export function buildAugmentedSystemPrompt(
   }
 
   if (webSearchRan) {
-    const resultsBlock = searchError
-      ? `Web search failed: ${searchError}`
-      : formatSearchResults(sources);
-
-    parts.push(
-      `--- Web results for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${resultsBlock}\n---`
-    );
+    if (searchError) {
+      parts.push(`Web search failed: ${searchError}`);
+    } else if (watchdogSynopsis) {
+      // Watchdog already synthesized the results — give main model a clean briefing.
+      parts.push(
+        `--- Research briefing for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${watchdogSynopsis}\n---`
+      );
+    } else {
+      parts.push(
+        `--- Web results for: "${plan.webSearchQuery.slice(0, 300)}" ---\n${formatSearchResults(sources)}\n---`
+      );
+    }
   }
 
   return parts.join("\n\n");
