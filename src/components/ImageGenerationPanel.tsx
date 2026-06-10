@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ImageForgeCanvas } from "@/components/ImageForgeCanvas";
 
@@ -24,6 +25,7 @@ export function ImageGenerationPanel({
 }: ImageGenerationPanelProps) {
   const isError = stage === "error";
   const label = isError ? "Couldn't create image" : "Creating image";
+  const [borderColor, setBorderColor] = useState("rgb(255, 0, 0)");
 
   return (
     <div className="image-forge my-4" role="status" aria-live="polite">
@@ -34,10 +36,10 @@ export function ImageGenerationPanel({
           "image-forge-stage",
           isError ? "image-forge-stage--error" : "",
         ].join(" ")}
+        style={{ "--forge-border-color": borderColor } as React.CSSProperties}
       >
-        <ImageForgeCanvas dimmed={isError} />
+        <ImageForgeCanvas dimmed={isError} onAccentColor={setBorderColor} />
         <div className="image-forge-edge" aria-hidden />
-        <div className="image-forge-shine" aria-hidden />
       </div>
 
       {isError && error ? (
@@ -65,7 +67,7 @@ export function ImageGenResult({
       <div className="image-forge-stage image-forge-stage--done">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} className="image-forge-result-img" />
-        <div className="image-forge-edge image-forge-edge--fade" aria-hidden />
+        <div className="image-forge-edge image-forge-edge--done" aria-hidden />
       </div>
     </motion.div>
   );

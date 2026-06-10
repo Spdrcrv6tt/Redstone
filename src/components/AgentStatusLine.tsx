@@ -24,7 +24,7 @@ function lineOffset(i: number) {
 
 function organicPosition(t: number, index: number) {
   const phase = (index * 2 * Math.PI) / 3;
-  const speed = 0.95 + index * 0.11;
+  const speed = 1.75 + index * 0.18;
   const angle = t * speed + phase;
   const swell = 1 + 0.28 * Math.sin(angle * 2.2 + phase * 1.3);
   const lunge = 0.72 + 0.28 * Math.cos(angle * 1.4 - phase * 0.85);
