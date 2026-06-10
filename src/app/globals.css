@@ -1028,18 +1028,19 @@ button.source-cite {
   height: 100%;
 }
 
-.agent-status-glow-halo {
-  position: absolute;
-  inset: -4px;
-  border-radius: 999px;
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(0, 229, 255, 0.35) 0%,
-    rgba(255, 26, 92, 0.2) 40%,
-    transparent 72%
-  );
-  filter: blur(6px);
-  pointer-events: none;
+@property --agent-dot-color {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #ff2244;
+}
+
+@keyframes agent-dot-color {
+  0%   { --agent-dot-color: #ff2244; }
+  20%  { --agent-dot-color: #1a7fff; }
+  40%  { --agent-dot-color: #00e676; }
+  60%  { --agent-dot-color: #b44aff; }
+  80%  { --agent-dot-color: #ffd600; }
+  100% { --agent-dot-color: #ff2244; }
 }
 
 .agent-status-dot {
@@ -1051,7 +1052,27 @@ button.source-cite {
   margin: -0.23rem 0 0 -0.23rem;
   border-radius: 999px;
   background: var(--text-muted);
-  will-change: transform, opacity, box-shadow;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.agent-status-dot--work {
+  --agent-dot-color: #ff2244;
+  background-color: var(--agent-dot-color);
+  animation: agent-dot-color 5s linear infinite;
+  box-shadow: 0 0 9px color-mix(in srgb, var(--agent-dot-color) 75%, transparent);
+}
+
+.agent-status-dot--work.agent-status-dot--0 {
+  animation-delay: 0s;
+}
+
+.agent-status-dot--work.agent-status-dot--1 {
+  animation-delay: -1.65s;
+}
+
+.agent-status-dot--work.agent-status-dot--2 {
+  animation-delay: -3.3s;
 }
 .agent-status-text {
   font-size: 0.8125rem;
