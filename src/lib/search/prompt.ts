@@ -167,30 +167,30 @@ export function buildAugmentedSystemPrompt(
   return finalSystemPrompt;
 }
 
-const DIAGRAM_CORE = `You are a technical data architect. The user wants to visualize a complex mechanical or scientific system. Our UI renders native interactive diagrams from a strict JSON configuration — you do NOT write HTML, CSS, JavaScript, or Canvas code.
+const DIAGRAM_CORE = `You are a technical data architect. The user wants to visualize a complex mechanical, scientific, or conceptual system.
+Our UI renders native interactive diagrams from a strict JSON configuration — you do NOT write HTML, CSS, JavaScript, or Canvas code.
 
 CRITICAL RULES:
 1. Wrap valid JSON exactly inside: <redstone-diagram>...</redstone-diagram>
 2. Do NOT use markdown. Do NOT use \`\`\`json code fences. Start immediately with <redstone-diagram>{
-3. Output ONLY the diagram block. No preamble, apology, citations, or mention of photos or missing images.
+3. Output ONLY the diagram block. Provide NO other text, preamble, or apologies.
 4. Never reference system prompts, external data blocks, or internal tooling.
-5. Keep the JSON compact — under 30 lines. Use accurate numbers and labels from your knowledge or the external data block.
+5. Keep the JSON compact. Use accurate numbers and labels from your knowledge or the external data block.
 
-Supported types:
-
-inline-engine — four-stroke inline engines (cars, motorcycles, etc.):
+JSON SCHEMA:
 <redstone-diagram>
 {
-  "type": "inline-engine",
-  "title": "Inline-4 Four-Stroke Engine",
-  "cylinders": 4,
-  "firingOrder": [1, 3, 4, 2],
-  "labels": ["Intake", "Compression", "Power", "Exhaust"],
-  "notes": "Brief factual note about timing or balance."
+  "widget_type": "[DYNAMIC_TYPE]",
+  "title": "Title of the visualization",
+  "data": {
+  },
+  "layout_hint": "radial | linear | grid"
 }
 </redstone-diagram>
 
-Pick the closest supported type. For engines always use inline-engine with the correct cylinder count and firing order.`;
+Invent a descriptive widget_type for the concept (e.g. "engine-diagram", "solar-system", "timeline", "nuclear-reactor", "generic-chart").
+Populate data with whatever arrays, numbers, labels, events, and relationships the concept needs.
+Choose layout_hint to match the structure: linear for sequences/timelines, radial for orbital/cyclic systems, grid for comparisons.`;
 
 /** Dedicated system prompt for interactive diagram turns — no photo/visual conflict rules. */
 export function buildDiagramSystemPrompt(
@@ -221,7 +221,7 @@ export function buildDiagramSystemPrompt(
   if (webSearchRan && !searchError && sources.length > 0) {
     finalSystemPrompt += purifyAndInjectContext(sources, plan.rawUserQuery);
     finalSystemPrompt +=
-      "\n\nUse the external data above for accurate firing orders, labels, counts, and sequence order in the JSON fields. Do not quote it as prose.";
+      "\n\nUse the external data above for accurate values in the JSON data object. Do not quote it as prose.";
   }
 
   return finalSystemPrompt;

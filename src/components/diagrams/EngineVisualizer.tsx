@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
-import type { InlineEngineDiagramConfig } from "@/types/diagram";
+import type { EngineDiagramData } from "@/types/diagram";
 
 const PHASE_COLORS = ["#3b82f6", "#f59e0b", "#ef4444", "#94a3b8"];
 const DEFAULT_LABELS = ["Intake", "Compression", "Power", "Exhaust"];
@@ -22,13 +22,14 @@ function pistonOffset(phase: number): string {
 }
 
 interface EngineVisualizerProps {
-  config: InlineEngineDiagramConfig;
+  data: EngineDiagramData;
+  title?: string;
 }
 
-export function EngineVisualizer({ config }: EngineVisualizerProps) {
-  const labels = config.labels ?? DEFAULT_LABELS;
-  const firingOrder = config.firingOrder;
-  const cylinderCount = config.cylinders ?? firingOrder.length;
+export function EngineVisualizer({ data, title }: EngineVisualizerProps) {
+  const labels = data.labels ?? DEFAULT_LABELS;
+  const firingOrder = data.firingOrder ?? data.firing_order ?? [1, 2, 3, 4];
+  const cylinderCount = data.cylinders ?? firingOrder.length;
 
   const [orderIdx, setOrderIdx] = useState(0);
   const [phaseIdx, setPhaseIdx] = useState(0);
@@ -78,7 +79,7 @@ export function EngineVisualizer({ config }: EngineVisualizerProps) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-primary">
-            {config.title ?? "Inline Engine"}
+            {title ?? "Inline Engine"}
           </h3>
           <p className="text-xs text-muted mt-0.5">
             Firing order: {firingOrder.join("-")} · Step{" "}
@@ -188,9 +189,9 @@ export function EngineVisualizer({ config }: EngineVisualizerProps) {
         ))}
       </div>
 
-      {config.notes && (
+      {data.notes && (
         <p className="text-xs text-muted leading-relaxed border-t border-theme pt-3">
-          {config.notes}
+          {data.notes}
         </p>
       )}
     </div>

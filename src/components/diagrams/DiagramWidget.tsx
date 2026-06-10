@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { EngineVisualizer } from "@/components/diagrams/EngineVisualizer";
+import { DiagramWidgetRouter } from "@/components/diagrams/DiagramWidgetRouter";
 import { LegacyHtmlDiagram } from "@/components/diagrams/LegacyHtmlDiagram";
 import { parseDiagramPayload } from "@/lib/diagram-config";
 
@@ -14,15 +14,13 @@ export function DiagramWidget({ payload, className = "" }: DiagramWidgetProps) {
   const parsed = useMemo(() => parseDiagramPayload(payload), [payload]);
 
   if (parsed.kind === "config") {
-    if (parsed.config.type === "inline-engine") {
-      return (
-        <div
-          className={`diagram-card my-4 overflow-hidden rounded-2xl border border-theme bg-[#0f1117] shadow-sm ${className}`}
-        >
-          <EngineVisualizer config={parsed.config} />
-        </div>
-      );
-    }
+    return (
+      <div
+        className={`diagram-card my-4 overflow-hidden rounded-2xl border border-theme bg-[#0f1117] shadow-sm ${className}`}
+      >
+        <DiagramWidgetRouter config={parsed.config} />
+      </div>
+    );
   }
 
   if (parsed.kind === "html") {
@@ -34,7 +32,7 @@ export function DiagramWidget({ payload, className = "" }: DiagramWidgetProps) {
       <div
         className={`diagram-card my-4 rounded-2xl border border-red-500/30 bg-red-500/5 p-4 ${className}`}
       >
-        <p className="text-sm text-red-400">Could not load diagram.</p>
+        <p className="text-sm text-red-400">Failed to parse diagram data.</p>
         <p className="text-xs text-muted mt-1">{parsed.error}</p>
       </div>
     );
