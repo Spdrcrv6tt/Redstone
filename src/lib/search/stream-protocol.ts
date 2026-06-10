@@ -1,13 +1,12 @@
-import type { AgentStreamMeta } from "@/types";
-import type { OrchestratorPhase } from "@/lib/search/orchestrator";
+import type { AgentPipelineStatus, AgentStreamMeta } from "@/types";
 
 export interface AgentStatusEvent {
+  redstone_status: AgentPipelineStatus;
   message: string;
-  phase: OrchestratorPhase;
 }
 
 export function encodeStatusLine(status: AgentStatusEvent): string {
-  return JSON.stringify({ redstone_status: status }) + "\n";
+  return JSON.stringify(status) + "\n";
 }
 
 export function encodeMetaLine(meta: AgentStreamMeta): string {

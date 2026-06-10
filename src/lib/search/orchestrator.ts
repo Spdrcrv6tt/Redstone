@@ -1,40 +1,35 @@
 import { upstreamHeaders } from "@/lib/proxy";
 import type { ImageSearchPlan } from "@/lib/search/coordinator";
-export type OrchestratorPhase =
-  | "orchestrate"
-  | "web"
-  | "image"
-  | "generate";
+
+export type RouterIntent =
+  | "factual_query"
+  | "procedural_task"
+  | "creative"
+  | "code_generation";
+
+export type RouterUiHint =
+  | "standard"
+  | "table"
+  | "step_by_step"
+  | "comparison";
 
 export interface OrchestratorPlan {
+  intent: RouterIntent;
   webSearch: boolean;
   webQuery: string;
   imageSearch: boolean;
   imageQuery: string;
-  reason: string;
+  uiHint: RouterUiHint;
 }
 
-const ORCHESTRATOR_PROMPT = `You are the orchestrator for Redstone chat. Decide which tools to run BEFORE the main model answers.
+const ORCHESTRATOR_PROMPT = `You are a rigid routing engine. Analyze the incoming user query. Classify its core intent, determine if external live data is mandatory, and select the optimal UI layout hint to render the expected data structure. Do not output anything other than the requested JSON schema.
 
-Available tools:
-- web_search: Brave web search for current facts, people, ships, missions, places, news, or specific entities.
-- image_search: Find a photograph of a physical thing, vessel, facility, or person portrait.
-- none: Answer from model knowledge only (greetings, coding, math, creative writing, opinions).
-
-Reply with ONLY valid JSON, no markdown:
-{"web_search":boolean,"web_query":"search query or empty","image_search":boolean,"image_query":"image subject or empty","reason":"one short phrase"}
-
-Rules:
-- web_search and image_search are INDEPENDENT — both can be true at the same time.
+Field rules:
+- intent: factual_query (facts/entities/history), procedural_task (how-to steps), creative (writing/brainstorm), code_generation (code/debug).
+- web_search and image_search are independent — both may be true.
 - web_query: concise Brave query when web_search is true.
-- image_query: a precise, specific subject for the photo search when image_search is true.
-  - ALWAYS include disambiguating terms so the right object is found.
-  - If the subject is fictional (movie/TV/book), add the franchise name: "USS Enterprise NCC-1701-D Star Trek starship", "Millennium Falcon Star Wars spacecraft".
-  - If the subject shares a name with something real, specify which one: "Apollo 11 Saturn V rocket launch" not "Apollo 11".
-  - Examples: "SL-1 nuclear reactor Idaho", "Neil Armstrong NASA portrait", "F-14 Tomcat fighter jet VF-84".
-- Use image_search when the user asks about or asks to see a physical object, vessel, aircraft, person, place, or fictional vehicle/ship — a photo adds clear value.
-- Use BOTH web_search and image_search together for "tell me about [thing]" queries where facts AND a visual are useful.
-- Use neither for hello, thanks, code rewrites, math, or general chat.`;
+- image_query: disambiguated photo subject when image_search is true (e.g. "USS Enterprise NCC-1701-D Star Trek starship").
+- ui_hint: standard (default prose), table (lists/rosters), step_by_step (procedures), comparison (A vs B).`;
 
 /** Strip <think>…</think> blocks that Qwen3 and similar models prepend. */
 function stripThinking(text: string): string {
@@ -56,19 +51,25 @@ function parseOrchestratorResponse(raw: string): OrchestratorPlan | null {
 
   try {
     const data = JSON.parse(jsonText) as {
+      intent?: string;
       web_search?: boolean;
       web_query?: string;
       image_search?: boolean;
       image_query?: string;
-      reason?: string;
+      ui_hint?: string;
     };
 
+    const intent = data.intent as RouterIntent | undefined;
+    const uiHint = data.ui_hint as RouterUiHint | undefined;
+    if (!intent || !uiHint) return null;
+
     return {
+      intent,
       webSearch: !!data.web_search,
       webQuery: (data.web_query ?? "").trim(),
       imageSearch: !!data.image_search,
       imageQuery: (data.image_query ?? "").trim(),
-      reason: (data.reason ?? "watchdog").trim(),
+      uiHint,
     };
   } catch {
     return null;
@@ -83,21 +84,34 @@ export interface OrchestratorResult {
   raw?: string;
 }
 
-const WATCHDOG_OUTPUT_SCHEMA = {
+const toolRouterSchema = {
   type: "object",
   properties: {
+    intent: {
+      type: "string",
+      enum: [
+        "factual_query",
+        "procedural_task",
+        "creative",
+        "code_generation",
+      ],
+    },
     web_search: { type: "boolean" },
     web_query: { type: "string" },
     image_search: { type: "boolean" },
     image_query: { type: "string" },
-    reason: { type: "string" },
+    ui_hint: {
+      type: "string",
+      enum: ["standard", "table", "step_by_step", "comparison"],
+    },
   },
   required: [
+    "intent",
     "web_search",
     "web_query",
     "image_search",
     "image_query",
-    "reason",
+    "ui_hint",
   ],
 } as const;
 
@@ -127,7 +141,7 @@ export async function runOrchestrator(
         model,
         stream: false,
         think: false,
-        format: WATCHDOG_OUTPUT_SCHEMA,
+        format: toolRouterSchema,
         messages: [
           {
             role: "user",

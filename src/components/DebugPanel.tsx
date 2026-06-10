@@ -82,6 +82,12 @@ export function DebugPanel({ message, search }: DebugPanelProps) {
               search?.query ? `Query: ${search.query}` : null,
               decision.orchestrator
                 ? [
+                    decision.orchestrator.intent
+                      ? `Watchdog intent: ${decision.orchestrator.intent}`
+                      : null,
+                    decision.orchestrator.uiHint
+                      ? `Watchdog UI hint: ${decision.orchestrator.uiHint}`
+                      : null,
                     `Watchdog web: ${decision.orchestrator.webSearch}`,
                     decision.orchestrator.webQuery
                       ? `Watchdog web query: ${decision.orchestrator.webQuery}`

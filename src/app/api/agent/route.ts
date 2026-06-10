@@ -14,7 +14,6 @@ import { finalizeVisualMode, planTurn } from "@/lib/search/coordinator";
 import {
   imagePlanFromOrchestrator,
   runOrchestrator,
-  type OrchestratorPhase,
 } from "@/lib/search/orchestrator";
 import { buildAugmentedSystemPrompt } from "@/lib/search/prompt";
 import { routerWantsSearch } from "@/lib/search/router";
@@ -26,6 +25,7 @@ import {
 import type { ImageSearchPlan } from "@/lib/search/coordinator";
 import type { OllamaChatMessage } from "@/types";
 import type {
+  AgentPipelineStatus,
   AgentStreamMeta,
   OrchestratorDecisionMeta,
   SearchMode,
@@ -55,7 +55,7 @@ function parseSearchMode(value: unknown): SearchMode {
   return "auto";
 }
 
-type StatusEmitter = (message: string, phase: OrchestratorPhase) => void;
+type StatusEmitter = (state: AgentPipelineStatus, message: string) => void;
 
 interface PipelineInput {
   host: string;
@@ -113,8 +113,9 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   // When watchdog explicitly decides no image, suppress the heuristic plan.
   let watchdogSuppressImage = false;
 
+  emitStatus("routing", "Evaluating query intent...");
+
   if (searchMode === "aggressive") {
-    emitStatus("Analyzing request…", "orchestrate");
 
     if (!routerModel) {
       searchReason = "aggressive mode requires orchestrator model in Settings";
@@ -134,14 +135,16 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
       if (orch) {
         runWebSearch = orch.webSearch;
         overrideWebQuery = orch.webQuery || draftPlan.webSearchQuery;
-        searchReason = `watchdog: ${orch.reason}`;
+        searchReason = `watchdog: ${orch.intent} (${orch.uiHint})`;
         searchConfidence = "high";
         orchestratorMeta = {
+          intent: orch.intent,
+          uiHint: orch.uiHint,
           webSearch: orch.webSearch,
           webQuery: orch.webQuery,
           imageSearch: orch.imageSearch,
           imageQuery: orch.imageQuery,
-          reason: orch.reason,
+          reason: searchReason,
           watchdogRaw: orchResult.raw,
         };
 
@@ -177,7 +180,6 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     searchConfidence === "low" &&
     routerModel
   ) {
-    emitStatus("Checking if search is needed…", "orchestrate");
     const wants = await routerWantsSearch(
       host,
       apiKey,
@@ -199,7 +201,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     overrideWebQuery || draftPlan.webSearchQuery;
 
   if (runWebSearch && webQuery && braveKey) {
-    emitStatus("Searching the web…", "web");
+    emitStatus("searching", "Querying live web endpoints...");
     const t0 = Date.now();
     try {
       if (draftPlan.exhaustiveList && !overrideWebQuery) {
@@ -235,7 +237,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
     : overrideImagePlan ?? turnPlan.imageSearch;
 
   if (imagePlan && braveKey) {
-    emitStatus("Finding images…", "image");
+    emitStatus("searching", "Querying live web endpoints...");
     const t0 = Date.now();
     const withImages = await executeSearch(
       webQuery || turnPlan.webSearchQuery,
@@ -251,7 +253,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
 
   const visualMode = finalizeVisualMode(turnPlan, images.length);
 
-  emitStatus("Generating response…", "generate");
+  emitStatus("injecting", "Purifying and binding verified context...");
 
   const systemContent = buildAugmentedSystemPrompt(
     "",
@@ -359,16 +361,13 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const emitStatus: StatusEmitter = (message, phase) => {
-        const event: AgentStatusEvent = { message, phase };
-        controller.enqueue(encoder.encode(encodeStatusLine(event)));
+      const emitStatus: StatusEmitter = (state, message) => {
+        controller.enqueue(
+          encoder.encode(encodeStatusLine({ redstone_status: state, message }))
+        );
       };
 
       try {
-        if (searchMode === "auto" && !routerModel) {
-          emitStatus("Planning…", "orchestrate");
-        }
-
         const pipeline = await runAgentPipeline({
           host,
           apiKey,

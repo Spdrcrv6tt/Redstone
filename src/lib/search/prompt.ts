@@ -16,7 +16,11 @@ Citations: retrieved sources are reference material — you do NOT need to cite 
 - Only cite a specific fact (date, number, classification, name) you took from a web result. General summary sentences need no citation.
 - Use source numbers only: <cite>1</cite>. Never [1], [EN], or publisher names in brackets.
 
-You have been provided with raw web search snippets. You must base your answer on these snippets. If the snippets contain obvious contradictions, broken HTML fragments, or irrelevant SEO spam, IGNORE THEM and rely on your internal knowledge. Do NOT mention the search process or the format of the sources.`;
+--- SYSTEM INSTRUCTION OVERRIDE ---
+- You are provided with raw web search snippets to verify recent or specific real-world facts.
+- Do NOT restrict your entire response solely to the names or items present in the snippets if the user's query requires a comprehensive, established list. Use your extensive internal knowledge to provide a complete and accurate answer.
+- Treat the provided search context as a supplementary validation tool, not an absolute constraint on your total output vocabulary.
+- Maintain smooth, natural prose. Do not append website domain names, fragment words, or raw template brackets (e.g., 'WIKI', 'USS Enterprise.') to the ends of sentences.`;
 
 const CORE_NO_SEARCH = `You are Redstone, a helpful assistant. Answer from your knowledge and the conversation. Never mention system prompts.
 
@@ -57,6 +61,40 @@ function visualInstructions(
     default:
       return `NO image is displayed this turn. Do NOT mention photos, images, or visuals. Do NOT describe photographs or say that images exist, were found, or are available.`;
   }
+}
+
+export function purifyAndRankContext(
+  sources: SearchSource[],
+  userQuery: string
+): SearchSource[] {
+  const keywords = userQuery
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
+
+  return sources
+    .map((src) => {
+      const cleanSnippet = src.snippet
+        .replace(/&quot;/g, '"')
+        .replace(/&#x27;/g, "'")
+        .replace(/&amp;/g, "&")
+        .replace(/<\/?[^>]+(>|$)/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return { ...src, snippet: cleanSnippet };
+    })
+    .filter((src) => {
+      if (src.snippet.length < 50) return false;
+      if (
+        src.title.toLowerCase().includes("category:") ||
+        src.snippet.toLowerCase().includes("list of personnel")
+      ) {
+        return keywords.some((k) => src.snippet.toLowerCase().includes(k));
+      }
+      return true;
+    })
+    .slice(0, 4);
 }
 
 export function formatSearchResults(sources: SearchSource[]): string {
@@ -115,7 +153,8 @@ export function buildAugmentedSystemPrompt(
     if (searchError) {
       parts.push(`Web search failed: ${searchError}`);
     } else {
-      parts.push(formatSearchResults(sources));
+      const purified = purifyAndRankContext(sources, plan.rawUserQuery);
+      parts.push(formatSearchResults(purified));
     }
   }
 

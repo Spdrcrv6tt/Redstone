@@ -31,14 +31,20 @@ export interface SearchImage {
 
 export type SearchMode = "auto" | "always" | "never" | "aggressive";
 
-export type AgentStatusPhase = "orchestrate" | "web" | "image" | "generate";
+export type AgentPipelineStatus =
+  | "routing"
+  | "searching"
+  | "injecting"
+  | "generating";
 
 export interface AgentStatusMeta {
+  redstone_status: AgentPipelineStatus;
   message: string;
-  phase: AgentStatusPhase;
 }
 
 export interface OrchestratorDecisionMeta {
+  intent: string;
+  uiHint: string;
   webSearch: boolean;
   webQuery: string;
   imageSearch: boolean;
