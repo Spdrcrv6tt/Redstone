@@ -3,15 +3,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Check,
-  ImageUp,
-  Camera,
-  LayoutGrid,
-  MessageSquare,
-} from "lucide-react";
-import { useAppStore } from "@/lib/store";
-import type { EngineMode } from "@/types";
+import { Check, ImageUp, Camera, Presentation } from "lucide-react";
 
 interface ComposerAttachMenuProps {
   open: boolean;
@@ -19,6 +11,8 @@ interface ComposerAttachMenuProps {
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onUploadImage: () => void;
   onTakePhoto: () => void;
+  onSelectCanvas?: () => void;
+  showCanvasOption?: boolean;
   disabled?: boolean;
 }
 
@@ -28,10 +22,10 @@ export function ComposerAttachMenu({
   anchorRef,
   onUploadImage,
   onTakePhoto,
+  onSelectCanvas,
+  showCanvasOption = false,
   disabled,
 }: ComposerAttachMenuProps) {
-  const engineMode = useAppStore((s) => s.engineMode);
-  const setEngineMode = useAppStore((s) => s.setEngineMode);
   const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 240, above: false });
 
@@ -83,11 +77,6 @@ export function ComposerAttachMenu({
     };
   }, [open, anchorRef, onOpenChange]);
 
-  const pickMode = (mode: EngineMode) => {
-    setEngineMode(mode);
-    onOpenChange(false);
-  };
-
   const menuItem = (
     label: string,
     icon: ReactNode,
@@ -100,14 +89,19 @@ export function ComposerAttachMenu({
       disabled={disabled}
       className={[
         "w-full flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl text-left text-sm transition-colors",
-        active ? "bg-accent-muted text-primary font-medium" : "text-primary hover:bg-surface-hover",
+        active
+          ? "bg-accent-muted text-primary font-medium"
+          : "text-primary hover:bg-surface-hover",
         disabled ? "opacity-50 cursor-not-allowed" : "",
       ].join(" ")}
     >
       <span className="text-secondary flex-shrink-0">{icon}</span>
       <span className="flex-1">{label}</span>
       {active ? (
-        <Check className="w-4 h-4 flex-shrink-0" style={{ color: "var(--accent)" }} />
+        <Check
+          className="w-4 h-4 flex-shrink-0"
+          style={{ color: "var(--accent)" }}
+        />
       ) : null}
     </button>
   );
@@ -149,22 +143,22 @@ export function ComposerAttachMenu({
               }
             )}
 
-            <div className="my-1.5 mx-3 border-t border-theme" />
-
-            <p className="px-4 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
-              Modes
-            </p>
-            {engineMode === "chat"
-              ? menuItem(
+            {showCanvasOption && onSelectCanvas ? (
+              <>
+                <div className="my-1.5 mx-3 border-t border-theme" />
+                <p className="px-4 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+                  Workspace
+                </p>
+                {menuItem(
                   "Canvas",
-                  <LayoutGrid className="w-4 h-4" strokeWidth={1.75} />,
-                  () => pickMode("canvas")
-                )
-              : menuItem(
-                  "Chat",
-                  <MessageSquare className="w-4 h-4" strokeWidth={1.75} />,
-                  () => pickMode("chat")
+                  <Presentation className="w-4 h-4" strokeWidth={1.75} />,
+                  () => {
+                    onOpenChange(false);
+                    onSelectCanvas();
+                  }
                 )}
+              </>
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>,

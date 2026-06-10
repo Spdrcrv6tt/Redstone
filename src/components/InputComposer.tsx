@@ -16,6 +16,7 @@ import {
   X,
   FileText,
   Image as ImageIcon,
+  Presentation,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { ComposerAttachMenu } from "@/components/ComposerAttachMenu";
@@ -33,6 +34,9 @@ interface InputComposerProps {
   placeholder?: string;
   autoFocus?: boolean;
   onDraftChange?: (draft: string, hasAttachments: boolean) => void;
+  canvasPending?: boolean;
+  onCanvasPendingChange?: (pending: boolean) => void;
+  showCanvasMenuOption?: boolean;
 }
 
 export function InputComposer({
@@ -45,6 +49,9 @@ export function InputComposer({
   placeholder = "Ask anything",
   autoFocus,
   onDraftChange,
+  canvasPending = false,
+  onCanvasPendingChange,
+  showCanvasMenuOption = false,
 }: InputComposerProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
@@ -63,7 +70,6 @@ export function InputComposer({
     activeConversationId,
     conversations,
     updateConversationModel,
-    engineMode,
   } = useAppStore();
   const loading = useAppStore((s) => s.modelsLoading);
   const error = useAppStore((s) => s.modelsError);
@@ -242,7 +248,7 @@ export function InputComposer({
                 className={[
                   "composer-icon-btn composer-control-btn disabled:opacity-40",
                   attachMenuOpen ? "composer-attach-btn--open" : "",
-                  engineMode === "canvas" ? "composer-attach-btn--canvas" : "",
+                  canvasPending ? "composer-attach-btn--canvas" : "",
                 ].join(" ")}
               >
                 <Plus className="w-5 h-5" strokeWidth={1.75} />
@@ -253,8 +259,22 @@ export function InputComposer({
                 anchorRef={attachBtnRef}
                 onUploadImage={() => imageInputRef.current?.click()}
                 onTakePhoto={() => cameraInputRef.current?.click()}
+                showCanvasOption={showCanvasMenuOption}
+                onSelectCanvas={() => onCanvasPendingChange?.(true)}
                 disabled={isStreaming || attachments.length >= MAX_FILES}
               />
+              {canvasPending ? (
+                <button
+                  type="button"
+                  onClick={() => onCanvasPendingChange?.(false)}
+                  title="Remove canvas — stay in chat"
+                  className="composer-canvas-chip flex items-center gap-1 flex-shrink-0"
+                >
+                  <Presentation className="w-3.5 h-3.5" strokeWidth={1.75} />
+                  <span className="text-xs font-medium">Canvas</span>
+                  <X className="w-3 h-3 opacity-70" strokeWidth={2} />
+                </button>
+              ) : null}
               <input
                 ref={imageInputRef}
                 type="file"

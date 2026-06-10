@@ -22,6 +22,11 @@ export default function Home() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [composerDraft, setComposerDraft] = useState("");
   const [composerHasAttachments, setComposerHasAttachments] = useState(false);
+  const [canvasPending, setCanvasPending] = useState(false);
+  const [pendingCanvasMessage, setPendingCanvasMessage] = useState<{
+    content: string;
+    attachments: MessageAttachment[];
+  } | null>(null);
   const isMobile = useIsMobile();
 
   const {
@@ -31,16 +36,15 @@ export default function Home() {
     createConversation,
     setActiveConversation,
     setSidebarExpanded,
-    engineMode,
+    promoteConversationToCanvas,
   } = useAppStore();
 
-  const isCanvasMode = engineMode === "canvas";
-
   const conversation = conversations.find((c) => c.id === activeConversationId);
+  const isCanvasConversation = conversation?.engineMode === "canvas";
   const messages = conversation?.messages ?? [];
   const isStreaming = messages.some((m) => m.isStreaming);
   const isChat = messages.length > 0;
-  const showAurora = !isChat && !isCanvasMode;
+  const showAurora = !isChat && !isCanvasConversation;
   const showSplash =
     !isChat && !composerDraft.trim() && !composerHasAttachments;
 
@@ -51,7 +55,9 @@ export default function Home() {
     return null;
   })();
 
-  const { sendMessage, stop, regenerate } = useChat(activeConversationId);
+  const { sendMessage, stop, regenerate } = useChat(
+    isCanvasConversation ? null : activeConversationId
+  );
 
   const pending = useRef<{
     content: string;
@@ -61,12 +67,12 @@ export default function Home() {
   sendRef.current = sendMessage;
 
   useEffect(() => {
-    if (pending.current && activeConversationId) {
+    if (pending.current && activeConversationId && !isCanvasConversation) {
       const { content, attachments } = pending.current;
       pending.current = null;
       setTimeout(() => sendRef.current(content, attachments), 0);
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, isCanvasConversation]);
 
   useEffect(() => {
     if (!isMobile) setMobileNavOpen(false);
@@ -79,11 +85,26 @@ export default function Home() {
     };
   }, [mobileNavOpen]);
 
+  useEffect(() => {
+    setCanvasPending(false);
+  }, [activeConversationId]);
+
   const handleSend = useCallback(
     (content: string, attachments: MessageAttachment[] = []) => {
       if (!settings.defaultModel) return;
       const hasContent = content.trim().length > 0 || attachments.length > 0;
       if (!hasContent) return;
+
+      if (canvasPending && !isCanvasConversation) {
+        let convId = activeConversationId;
+        if (!convId) {
+          convId = createConversation(settings.defaultModel);
+        }
+        promoteConversationToCanvas(convId);
+        setCanvasPending(false);
+        setPendingCanvasMessage({ content, attachments });
+        return;
+      }
 
       if (!activeConversationId) {
         pending.current = { content, attachments };
@@ -92,20 +113,16 @@ export default function Home() {
         sendMessage(content, attachments);
       }
     },
-    [activeConversationId, settings.defaultModel, createConversation, sendMessage]
+    [
+      activeConversationId,
+      canvasPending,
+      createConversation,
+      isCanvasConversation,
+      promoteConversationToCanvas,
+      sendMessage,
+      settings.defaultModel,
+    ]
   );
-
-  const ensureWorkspaceConversation = useCallback(() => {
-    if (activeConversationId) return activeConversationId;
-    if (!settings.defaultModel) return "";
-    return createConversation(settings.defaultModel);
-  }, [activeConversationId, createConversation, settings.defaultModel]);
-
-  useEffect(() => {
-    if (isCanvasMode && !activeConversationId && settings.defaultModel) {
-      createConversation(settings.defaultModel);
-    }
-  }, [isCanvasMode, activeConversationId, settings.defaultModel, createConversation]);
 
   const handleNewChat = useCallback(() => {
     setActiveConversation(null);
@@ -113,6 +130,8 @@ export default function Home() {
     setMobileNavOpen(false);
     setComposerDraft("");
     setComposerHasAttachments(false);
+    setCanvasPending(false);
+    setPendingCanvasMessage(null);
   }, [setActiveConversation, setSidebarExpanded]);
 
   const handleDraftChange = useCallback(
@@ -124,6 +143,30 @@ export default function Home() {
   );
 
   const composerKey = activeConversationId ?? "landing";
+  const showCanvasMenuOption = !isCanvasConversation;
+
+  const chatComposer = (
+    <InputComposer
+      key={composerKey}
+      onSend={handleSend}
+      onStop={stop}
+      isStreaming={isStreaming}
+      autoFocus={!isMobile}
+      placeholder={
+        canvasPending
+          ? isMobile
+            ? "Describe your canvas…"
+            : "Describe what to build on the canvas…"
+          : isMobile
+            ? "Ask"
+            : "Ask anything"
+      }
+      onDraftChange={handleDraftChange}
+      canvasPending={canvasPending}
+      onCanvasPendingChange={setCanvasPending}
+      showCanvasMenuOption={showCanvasMenuOption}
+    />
+  );
 
   return (
     <>
@@ -141,7 +184,7 @@ export default function Home() {
             className={[
               "app-main flex flex-col flex-1 min-w-0 relative isolate overflow-hidden",
               isChat ? "app-main--chat" : "",
-              isCanvasMode ? "app-main--canvas" : "",
+              isCanvasConversation ? "app-main--canvas" : "",
             ].join(" ")}
           >
             <AnimatePresence>
@@ -149,99 +192,76 @@ export default function Home() {
             </AnimatePresence>
 
             <div className="app-main-stack relative z-10 flex flex-col flex-1 min-h-0 min-w-0">
-              {!isCanvasMode ? (
-                <MobileTopBar
-                  onOpenMenu={() => setMobileNavOpen(true)}
-                  onNewChat={handleNewChat}
+              <MobileTopBar
+                onOpenMenu={() => setMobileNavOpen(true)}
+                onNewChat={handleNewChat}
+              />
+
+              {isCanvasConversation && activeConversationId ? (
+                <WorkspaceView
+                  conversationId={activeConversationId}
+                  isMobile={isMobile}
+                  pendingMessage={pendingCanvasMessage}
+                  onPendingMessageSent={() => setPendingCanvasMessage(null)}
                 />
-              ) : null}
-
-              {isCanvasMode ? (
-                activeConversationId ? (
-                  <WorkspaceView
-                    conversationId={activeConversationId}
-                    onEnsureConversation={ensureWorkspaceConversation}
-                    isMobile={isMobile}
-                  />
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-sm text-muted">
-                    Opening workspace…
-                  </div>
-                )
               ) : (
-              <div
-                className={[
-                  "flex-1 flex flex-col min-h-0",
-                  !isChat ? "landing-shell" : "",
-                ].join(" ")}
-              >
-                {isChat ? (
-                  <>
-                    <motion.div
-                      className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.25 }}
-                    >
-                      <div className="chat-thread-wrap mx-auto w-full px-3 sm:px-6 pt-4 md:pt-10 pb-4">
-                        {messages.map((msg) => (
-                          <MessageBubble
-                            key={msg.id}
-                            message={msg}
-                            conversationId={activeConversationId ?? undefined}
-                            onRegenerate={regenerate}
-                            showRegenerate={
-                              msg.id === lastAssistantId && !isStreaming
-                            }
-                          />
-                        ))}
+                <div
+                  className={[
+                    "flex-1 flex flex-col min-h-0",
+                    !isChat ? "landing-shell" : "",
+                  ].join(" ")}
+                >
+                  {isChat ? (
+                    <>
+                      <motion.div
+                        className="chat-scroll flex-1 overflow-y-auto min-h-0 overscroll-contain"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        <div className="chat-thread-wrap mx-auto w-full px-3 sm:px-6 pt-4 md:pt-10 pb-4">
+                          {messages.map((msg) => (
+                            <MessageBubble
+                              key={msg.id}
+                              message={msg}
+                              conversationId={activeConversationId ?? undefined}
+                              onRegenerate={regenerate}
+                              showRegenerate={
+                                msg.id === lastAssistantId && !isStreaming
+                              }
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+
+                      <motion.div
+                        layout
+                        layoutId="chat-composer"
+                        transition={COMPOSER_SPRING}
+                        className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
+                      >
+                        {chatComposer}
+                      </motion.div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="landing-splash-slot">
+                        <AnimatePresence mode="wait">
+                          {showSplash ? <LandingGreeting key="splash" /> : null}
+                        </AnimatePresence>
                       </div>
-                    </motion.div>
 
-                    <motion.div
-                      layout
-                      layoutId="chat-composer"
-                      transition={COMPOSER_SPRING}
-                      className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
-                    >
-                      <InputComposer
-                        key={composerKey}
-                        onSend={handleSend}
-                        onStop={stop}
-                        isStreaming={isStreaming}
-                        autoFocus={!isMobile}
-                        placeholder={isMobile ? "Ask" : "Ask anything"}
-                        onDraftChange={handleDraftChange}
-                      />
-                    </motion.div>
-                  </>
-                ) : (
-                  <>
-                    <div className="landing-splash-slot">
-                      <AnimatePresence mode="wait">
-                        {showSplash ? <LandingGreeting key="splash" /> : null}
-                      </AnimatePresence>
-                    </div>
+                      <motion.div
+                        layoutId="chat-composer"
+                        className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
+                      >
+                        {chatComposer}
+                      </motion.div>
 
-                    <motion.div
-                      layoutId="chat-composer"
-                      className="chat-composer-wrap w-full flex-shrink-0 mx-auto composer-in-chat"
-                    >
-                      <InputComposer
-                        key={composerKey}
-                        onSend={handleSend}
-                        onStop={stop}
-                        isStreaming={isStreaming}
-                        autoFocus={!isMobile}
-                        placeholder={isMobile ? "Ask" : "Ask anything"}
-                        onDraftChange={handleDraftChange}
-                      />
-                    </motion.div>
-
-                    <div className="landing-balance-slot" aria-hidden />
-                  </>
-                )}
-              </div>
+                      <div className="landing-balance-slot" aria-hidden />
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </main>

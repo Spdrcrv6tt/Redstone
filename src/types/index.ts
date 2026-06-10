@@ -118,7 +118,9 @@ export interface Conversation {
   model: string;
   createdAt: number;
   updatedAt: number;
-  /** Spatial workspace document (canvas mode). */
+  /** Irreversible — once "canvas", always spatial workspace for this chat. */
+  engineMode?: EngineMode;
+  /** Spatial workspace document (canvas conversations). */
   canvas?: CanvasDocument;
 }
 

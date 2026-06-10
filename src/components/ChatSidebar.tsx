@@ -11,6 +11,8 @@ import {
   Sun,
   Moon,
   X,
+  MessageSquare,
+  Presentation,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { RedstoneLogo } from "@/components/RedstoneLogo";
@@ -125,7 +127,16 @@ function SidebarPanel({
                 : "text-secondary hover:bg-surface-hover hover:text-primary",
             ].join(" ")}
           >
-            <p className="flex-1 text-sm truncate leading-snug">{conv.title}</p>
+            <span className="flex-shrink-0 text-muted" aria-hidden>
+              {conv.engineMode === "canvas" ? (
+                <Presentation className="w-4 h-4" strokeWidth={1.75} />
+              ) : (
+                <MessageSquare className="w-4 h-4" strokeWidth={1.75} />
+              )}
+            </span>
+            <p className="flex-1 text-sm truncate leading-snug min-w-0">
+              {conv.title}
+            </p>
             <button
               onClick={(e) => {
                 e.stopPropagation();

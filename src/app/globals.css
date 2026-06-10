@@ -1708,6 +1708,20 @@ button.source-cite {
   color: var(--accent);
 }
 
+.composer-canvas-chip {
+  padding: 0.35rem 0.55rem 0.35rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.composer-canvas-chip:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
 /* ─── Workspace canvas ───────────────────────────────────────────────────── */
 .app-main--canvas {
   background: var(--bg-base);

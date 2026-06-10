@@ -15,7 +15,6 @@ import type {
   CanvasCardData,
   CanvasDocument,
   CanvasPatch,
-  EngineMode,
 } from "@/types/canvas";
 import {
   DEFAULT_THINKING_ORBS,
@@ -39,7 +38,6 @@ interface AppState {
 
   // ui
   theme: Theme;
-  engineMode: EngineMode;
   sidebarExpanded: boolean;
   settingsOpen: boolean;
 
@@ -65,7 +63,7 @@ interface AppState {
   setSidebarExpanded: (expanded: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
 
-  setEngineMode: (mode: EngineMode) => void;
+  promoteConversationToCanvas: (conversationId: string) => void;
   getCanvas: (conversationId: string) => CanvasDocument;
   setCanvasDocument: (conversationId: string, canvas: CanvasDocument) => void;
   applyCanvasPatches: (conversationId: string, patches: CanvasPatch[]) => void;
@@ -103,7 +101,6 @@ export const useAppStore = create<AppState>()(
       modelsError: null,
       settings: DEFAULT_SETTINGS,
       theme: "light",
-      engineMode: "chat",
       sidebarExpanded: false,
       settingsOpen: false,
 
@@ -215,7 +212,20 @@ export const useAppStore = create<AppState>()(
       setSidebarExpanded: (expanded) => set({ sidebarExpanded: expanded }),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
 
-      setEngineMode: (mode) => set({ engineMode: mode }),
+      promoteConversationToCanvas: (conversationId) => {
+        set((s) => ({
+          conversations: s.conversations.map((c) =>
+            c.id === conversationId && c.engineMode !== "canvas"
+              ? {
+                  ...c,
+                  engineMode: "canvas" as const,
+                  canvas: c.canvas ?? EMPTY_CANVAS,
+                  updatedAt: Date.now(),
+                }
+              : c
+          ),
+        }));
+      },
 
       getCanvas: (conversationId) => {
         const conv = get().conversations.find((c) => c.id === conversationId);
@@ -277,7 +287,6 @@ export const useAppStore = create<AppState>()(
         activeConversationId: s.activeConversationId,
         settings: s.settings,
         theme: s.theme,
-        engineMode: s.engineMode,
       }),
       merge: (persisted, current) => {
         const saved = persisted as Partial<AppState> | undefined;
@@ -286,10 +295,6 @@ export const useAppStore = create<AppState>()(
           ...current,
           ...saved,
           theme: saved.theme ?? current.theme,
-          engineMode:
-            saved.engineMode === "canvas" || saved.engineMode === "chat"
-              ? saved.engineMode
-              : current.engineMode,
           settings: {
             ...DEFAULT_SETTINGS,
             ...saved.settings,
