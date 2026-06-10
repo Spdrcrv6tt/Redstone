@@ -20,7 +20,7 @@ export function AmbientBackground() {
     >
       <div className="ambient-base absolute inset-0" />
 
-      <div className="ambient-aurora-mask absolute inset-x-0 top-0 h-[62vh]">
+      <div className="ambient-aurora-mask absolute inset-x-0 top-0 h-[68vh]">
         <div className="ambient-sky-field absolute inset-0">
           <div className="ambient-gemini-sky ambient-gemini-sky-animate absolute inset-0" />
           <div className="ambient-gemini-sky ambient-gemini-sky-alt ambient-gemini-sky-alt-animate absolute inset-0" />
@@ -59,6 +59,8 @@ export function AmbientBackground() {
               : "top-[6%] right-[24%] w-[min(320px,44vw)] h-[min(140px,16vh)]"
           }`}
         />
+
+        <div className="ambient-aurora-feather absolute inset-x-0 bottom-0 h-[52%]" />
       </div>
     </motion.div>
   );
