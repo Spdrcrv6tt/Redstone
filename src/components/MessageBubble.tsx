@@ -47,13 +47,13 @@ export function MessageBubble({
     setImageReady(false);
   }, [message.id, hasSearchImages]);
 
-  const hasDiagramOpen =
-    !!assistantContent && /<redstone-diagram\b/i.test(assistantContent);
+  const hasWidgetOpen =
+    !!assistantContent && /<redstone-widget\b/i.test(assistantContent);
   const isPending =
     message.isStreaming || (hasSearchImages && !imageReady);
   const canRevealBody =
     !!assistantContent &&
-    (!isPending || (hasDiagramOpen && !!assistantContent));
+    (!isPending || (hasWidgetOpen && !!assistantContent));
   const showStatus =
     message.isStreaming && !assistantContent && message.agentStatus;
 
@@ -169,6 +169,7 @@ export function MessageBubble({
                       showLivePreview ? previewId : undefined
                     }
                     streamComplete={!message.isStreaming}
+                    model={message.model}
                   />
                   {showLivePreview && (
                     <LivePreview

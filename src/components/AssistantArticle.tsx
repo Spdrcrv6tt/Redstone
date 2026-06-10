@@ -1,9 +1,12 @@
 "use client";
 
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { DiagramPending, DiagramWidget } from "@/components/diagrams/DiagramWidget";
+import {
+  DynamicWidgetLoader,
+  WidgetArchitectPending,
+} from "@/components/DynamicWidgetLoader";
 import { SearchImageLayout } from "@/components/SearchImageLayout";
-import { parseDiagramSegments } from "@/lib/diagram";
+import { parseContentSegments } from "@/lib/widget";
 import {
   inferImageLayout,
   parseImageLayout,
@@ -19,8 +22,8 @@ interface AssistantArticleProps {
   images: SearchImage[];
   searchSources: SearchSource[];
   previewTargetId?: string;
-  /** When true, an unclosed <redstone-diagram> is treated as complete. */
   streamComplete?: boolean;
+  model?: string;
 }
 
 interface MarkdownArticleBodyProps {
@@ -99,11 +102,12 @@ export function AssistantArticle({
   searchSources,
   previewTargetId,
   streamComplete = true,
+  model,
 }: AssistantArticleProps) {
   const { layout: chosenLayout, content: rawBody } = parseImageLayout(content);
-  const segments = parseDiagramSegments(rawBody, { streamComplete });
-  const hasDiagram = segments.some(
-    (s) => s.type === "diagram" || s.type === "diagram-pending"
+  const segments = parseContentSegments(rawBody, { streamComplete });
+  const hasWidget = segments.some(
+    (s) => s.type === "widget" || s.type === "widget-pending"
   );
 
   if (segments.length === 1 && segments[0].type === "markdown") {
@@ -125,16 +129,18 @@ export function AssistantArticle({
   return (
     <div className="journal-article">
       {segments.map((segment, index) => {
-        if (segment.type === "diagram") {
+        if (segment.type === "widget") {
           return (
-            <DiagramWidget
-              key={`diagram-${index}`}
-              payload={segment.payload}
+            <DynamicWidgetLoader
+              key={`widget-${index}`}
+              spec={segment.spec.props.spec}
+              height={segment.spec.props.height}
+              model={model}
             />
           );
         }
-        if (segment.type === "diagram-pending") {
-          return <DiagramPending key={`diagram-pending-${index}`} />;
+        if (segment.type === "widget-pending") {
+          return <WidgetArchitectPending key={`widget-pending-${index}`} />;
         }
 
         const isFirstMarkdown = firstMarkdown;
@@ -144,7 +150,7 @@ export function AssistantArticle({
           <MarkdownArticleBody
             key={`md-${index}`}
             content={segment.text}
-            images={!hasDiagram && isFirstMarkdown ? images : []}
+            images={!hasWidget && isFirstMarkdown ? images : []}
             searchSources={searchSources}
             previewTargetId={previewTargetId}
             chosenLayout={isFirstMarkdown ? chosenLayout : null}

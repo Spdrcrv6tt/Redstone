@@ -230,7 +230,7 @@ async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
   emitStatus(
     "injecting",
     turnPlan.needsDiagram
-      ? "Preparing interactive diagram prompt..."
+      ? "Preparing widget architect prompt..."
       : "Purifying and binding verified context..."
   );
 
